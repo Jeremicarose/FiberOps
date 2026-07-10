@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FiberOps Diagnostics</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Fiber infrastructure MVP</p>
+          <h1>FiberOps Diagnostics</h1>
+          <p class="hero-copy">
+            Explain failed Fiber payments and check readiness before a retry. The live mode is read-only and talks to a Fiber node through JSON-RPC.
+          </p>
+        </div>
+        <div class="hero-card">
+          <span class="hero-card__label">Focused problem</span>
+          <strong>Why did this payment fail, and what should I do next?</strong>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel panel-form">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Input</p>
+              <h2>Analyze a payment</h2>
+            </div>
+            <div class="mode-toggle" role="tablist" aria-label="Mode selector">
+              <button type="button" class="mode-toggle__button is-active" data-mode-button="demo">Demo</button>
+              <button type="button" class="mode-toggle__button" data-mode-button="live">Live node</button>
+            </div>
+          </div>
+
+          <form id="diagnostics-form" class="form-stack">
+            <input type="hidden" name="mode" value="demo" />
+
+            <div class="field-group" data-visibility="demo">
+              <label for="scenarioId">Demo scenario</label>
+              <select id="scenarioId" name="scenarioId"></select>
+              <p id="scenario-description" class="field-help"></p>
+            </div>
+
+            <div class="field-group" data-visibility="live" hidden>
+              <label for="endpoint">Fiber RPC endpoint</label>
+              <input id="endpoint" name="endpoint" type="url" placeholder="http://127.0.0.1:8227" />
+              <p class="field-help">Fiber docs show localhost RPC examples on port 8227. Add a Biscuit bearer token if your node is protected.</p>
+            </div>
+
+            <div class="field-group" data-visibility="live" hidden>
+              <label for="token">Biscuit bearer token</label>
+              <textarea id="token" name="token" rows="3" placeholder="Optional Bearer token"></textarea>
+            </div>
+
+            <div class="field-group" data-visibility="live" data-live-presets-group hidden>
+              <div class="stack-head">
+                <div>
+                  <label>Judge demo path</label>
+                  <p class="field-help">Run the exact local proof set in order, then drop into manual inspection if a judge asks for follow-up detail.</p>
+                </div>
+              </div>
+              <div id="live-story" class="story-grid"></div>
+            </div>
+
+            <div class="field-group" data-visibility="live" data-live-presets-group hidden>
+              <div class="stack-head">
+                <div>
+                  <label>Local proof set</label>
+                  <p class="field-help">These shortcuts use the real two-node Fiber environment in this workspace.</p>
+                </div>
+              </div>
+              <div id="live-presets" class="preset-grid"></div>
+            </div>
+
+            <div class="field-group" data-visibility="live" data-live-presets-group hidden>
+              <div class="stack-head">
+                <div>
+                  <label>Live lab</label>
+                  <p class="field-help">Real local nodes, one real channel, one successful payment, one failed payment.</p>
+                </div>
+              </div>
+              <div id="lab-facts" class="fact-grid"></div>
+            </div>
+
+            <div class="field-group">
+              <label for="invoice">Invoice</label>
+              <textarea id="invoice" name="invoice" rows="3" placeholder="Paste a Fiber invoice if you have one"></textarea>
+            </div>
+
+            <div class="field-row">
+              <div class="field-group">
+                <label for="paymentHash">Payment hash</label>
+                <input id="paymentHash" name="paymentHash" type="text" placeholder="0x..." />
+              </div>
+              <div class="field-group">
+                <label for="amount">Requested amount</label>
+                <input id="amount" name="amount" type="text" placeholder="150000000" />
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="targetPubkey">Target pubkey</label>
+              <input id="targetPubkey" name="targetPubkey" type="text" placeholder="0x02..." />
+              <p class="field-help">Use a Fiber pubkey, not a legacy peer_id. The diagnostics engine warns if the value looks like an old peer identifier.</p>
+            </div>
+
+            <div class="form-footer">
+              <button id="submit-button" type="submit" class="button-primary">Run diagnostics</button>
+              <p class="field-help">Live mode only reads node info, channels, invoice parsing, and payment status.</p>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel panel-results">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Output</p>
+              <h2>Diagnosis</h2>
+            </div>
+            <div id="result-status" class="pill">Waiting</div>
+          </div>
+
+          <div id="result-empty" class="empty-state">
+            Start with a demo scenario or connect a live Fiber node. The strongest demo path is to show a failed payment, classify it, then explain the next operator action in plain English.
+          </div>
+
+          <div id="result-content" hidden>
+            <div id="active-context" class="context-banner" hidden></div>
+            <div id="alerts-panel" class="alerts-stack" hidden></div>
+
+            <div class="result-card">
+              <div class="result-card__top">
+                <div>
+                  <p class="result-category" id="result-category"></p>
+                  <h3 id="result-headline"></h3>
+                </div>
+                <div class="confidence">
+                  <span>Confidence</span>
+                  <strong id="result-confidence">0%</strong>
+                </div>
+              </div>
+              <p id="result-explanation" class="result-explanation"></p>
+            </div>
+
+            <div class="metric-grid" id="summary-grid"></div>
+
+            <div class="dual-panel-grid">
+              <div class="list-block route-block">
+                <h4>Route preview</h4>
+                <div id="route-preview"></div>
+              </div>
+
+              <div class="list-block timeline-block">
+                <div class="stack-head">
+                  <div>
+                    <h4>Incident timeline</h4>
+                    <p class="field-help">Recent runs stay local in your browser to make the demo feel operational.</p>
+                  </div>
+                </div>
+                <div id="incident-timeline"></div>
+              </div>
+            </div>
+
+            <div class="list-block">
+              <h4>Checks</h4>
+              <ul id="checks-list" class="status-list"></ul>
+            </div>
+
+            <div class="list-block">
+              <h4>Evidence</h4>
+              <ul id="evidence-list" class="evidence-list"></ul>
+            </div>
+
+            <div class="list-block">
+              <h4>Next actions</h4>
+              <ul id="actions-list" class="action-list"></ul>
+            </div>
+
+            <div class="list-block">
+              <h4>References</h4>
+              <ul id="references-list" class="link-list"></ul>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

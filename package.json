@@ -1,0 +1,15 @@
+{
+  "name": "fiberops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fiber payment diagnostics and readiness checker",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
