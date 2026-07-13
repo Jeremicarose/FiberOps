@@ -37,9 +37,15 @@ for (const node of topology.nodes) {
 
 const baseConfig = readArchiveText("config/testnet/config.yml");
 await writeConfigIfNeeded(topology.nodes[0].configPath, baseConfig);
-await writeConfigIfNeeded(topology.nodes[1].configPath, createNode2Config(baseConfig));
+await writeConfigIfNeeded(
+  topology.nodes[1].configPath,
+  createNode2Config(baseConfig)
+);
 
-await writeFile(manifestPath, JSON.stringify(createLocalLabManifest(), null, 2));
+await writeFile(
+  manifestPath,
+  JSON.stringify(createLocalLabManifest(), null, 2)
+);
 
 process.stdout.write(
   `Prepared Fiber local lab in ${runtimeDir}. Run \"npm run lab:check\" to validate the generated state.\n`

@@ -3,105 +3,99 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FiberOps | Infrastructure Desktop</title>
+    <title>Fiber Desktop | Official Infrastructure Client</title>
     <meta
       name="description"
-      content="Workspace-based Fiber infrastructure desktop for diagnostics, routing, node inspection, activity review, and configuration."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Cormorant+Garamond:wght@500;600&display=swap"
-      rel="stylesheet"
+      content="Official infrastructure desktop for Fiber Network. Monitor nodes, inspect channels, diagnose failures, analyze routing, and investigate multi-node behavior."
     />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar-shell">
-        <div class="brand-block">
-          <p class="brand-kicker">Fiber desktop</p>
-          <h1>FiberOps</h1>
-          <span
-            id="bootstrap-badge"
-            class="status-chip"
-            data-bootstrap-state="loading"
-            >Bootstrapping</span
-          >
+    <div class="desktop-shell">
+      <aside class="app-rail">
+        <div class="brand-lockup">
+          <div class="brand-mark">F</div>
+          <div class="brand-copy">
+            <span class="brand-eyebrow">Fiber Network</span>
+            <h1>Fiber Desktop</h1>
+            <p>Infrastructure client</p>
+          </div>
         </div>
 
-        <nav class="workspace-nav" aria-label="Primary workspaces">
-          <button
-            type="button"
-            class="workspace-nav__item is-active"
-            data-nav-workspace="overview"
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            class="workspace-nav__item"
-            data-nav-workspace="nodes"
-          >
-            Nodes
-          </button>
-          <button
-            type="button"
-            class="workspace-nav__item"
-            data-nav-workspace="channels"
-          >
-            Channels
-          </button>
-          <button
-            type="button"
-            class="workspace-nav__item"
-            data-nav-workspace="routing"
-          >
-            Routing
-          </button>
-          <button
-            type="button"
-            class="workspace-nav__item"
-            data-nav-workspace="diagnostics"
-          >
-            Diagnostics
-          </button>
-          <button
-            type="button"
-            class="workspace-nav__item"
-            data-nav-workspace="activity"
-          >
-            Activity
-          </button>
-          <button
-            type="button"
-            class="workspace-nav__item"
-            data-nav-workspace="testing"
-          >
-            Testing
-          </button>
-          <button
-            type="button"
-            class="workspace-nav__item"
-            data-nav-workspace="configuration"
-          >
-            Configuration
-          </button>
-        </nav>
-
-        <div class="sidebar-footer">
+        <section class="rail-context-card">
+          <div class="rail-context-card__row">
+            <span class="rail-label">Runtime</span>
+            <span
+              id="bootstrap-badge"
+              class="state-chip"
+              data-bootstrap-state="loading"
+              >Booting</span
+            >
+          </div>
           <p
             id="bootstrap-message"
-            class="sidebar-note"
+            class="rail-context-card__message"
             data-bootstrap-state="loading"
           >
-            Loading bootstrap payload and runtime context.
+            Bootstrapping Fiber Desktop and reading runtime context.
           </p>
-        </div>
+        </section>
+
+        <nav class="rail-nav" aria-label="Primary workspaces">
+          <section class="rail-nav__section">
+            <span class="rail-nav__heading">Core</span>
+            <button
+              type="button"
+              class="rail-nav__item is-active"
+              data-nav-workspace="overview"
+            >
+              <strong>Overview</strong>
+            </button>
+            <button
+              type="button"
+              class="rail-nav__item"
+              data-nav-workspace="nodes"
+            >
+              <strong>Nodes</strong>
+            </button>
+            <button
+              type="button"
+              class="rail-nav__item"
+              data-nav-workspace="payments"
+            >
+              <strong>Payments</strong>
+            </button>
+            <button
+              type="button"
+              class="rail-nav__item"
+              data-nav-workspace="routing"
+            >
+              <strong>Routes</strong>
+            </button>
+            <button
+              type="button"
+              class="rail-nav__item"
+              data-nav-workspace="diagnostics"
+            >
+              <strong>Diagnostics</strong>
+            </button>
+            <button
+              type="button"
+              class="rail-nav__item"
+              data-nav-workspace="configuration"
+            >
+              <strong>Settings</strong>
+            </button>
+          </section>
+        </nav>
       </aside>
 
-      <div class="main-shell">
+      <div class="app-frame">
         <header class="topbar-shell">
+          <div class="topbar-breadcrumb">
+            <strong id="workspace-label">Overview</strong>
+          </div>
+
           <button
             type="button"
             class="command-button"
@@ -109,18 +103,41 @@
             aria-haspopup="dialog"
             aria-controls="command-palette"
           >
-            <span class="command-button__label">Search everywhere</span>
-            <span class="command-button__hint">Workspaces, nodes, history, actions</span>
+            <span class="command-button__label">Search</span>
             <span class="command-button__shortcut">⌘K</span>
           </button>
-          <div class="topbar-actions">
-            <div class="mode-toggle" aria-label="Mode selector">
+
+          <div class="topbar-context">
+            <div class="theme-toggle" aria-label="Theme mode">
+              <button
+                type="button"
+                class="theme-toggle__button is-active"
+                data-theme-button="system"
+              >
+                Auto
+              </button>
+              <button
+                type="button"
+                class="theme-toggle__button"
+                data-theme-button="light"
+              >
+                Light
+              </button>
+              <button
+                type="button"
+                class="theme-toggle__button"
+                data-theme-button="dark"
+              >
+                Dark
+              </button>
+            </div>
+            <div class="mode-toggle" aria-label="Observation mode">
               <button
                 type="button"
                 class="mode-toggle__button is-active"
                 data-mode-button="demo"
               >
-                Demo
+                Replay
               </button>
               <button
                 type="button"
@@ -130,79 +147,172 @@
                 Live
               </button>
             </div>
-            <div id="status-summary" class="status-summary">
-              Waiting for runtime status
-            </div>
           </div>
+
+          <nav class="topbar-nav" aria-label="Workspace navigation">
+            <button
+              type="button"
+              class="topbar-nav__item is-active"
+              data-nav-workspace="overview"
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              class="topbar-nav__item"
+              data-nav-workspace="nodes"
+            >
+              Nodes
+            </button>
+            <button
+              type="button"
+              class="topbar-nav__item"
+              data-nav-workspace="payments"
+            >
+              Payments
+            </button>
+            <button
+              type="button"
+              class="topbar-nav__item"
+              data-nav-workspace="routing"
+            >
+              Routes
+            </button>
+            <button
+              type="button"
+              class="topbar-nav__item"
+              data-nav-workspace="diagnostics"
+            >
+              Diagnostics
+            </button>
+            <button
+              type="button"
+              class="topbar-nav__item"
+              data-nav-workspace="configuration"
+            >
+              Settings
+            </button>
+          </nav>
         </header>
 
-        <main class="workspace-canvas">
-          <section id="workspace-root" aria-live="polite"></section>
-          <aside id="inspector-drawer" class="inspector-drawer" hidden>
-            <div class="inspector-drawer__surface">
-              <div class="inspector-drawer__head">
-                <div>
-                  <p class="workspace-kicker">Inspector</p>
-                  <h3 id="inspector-title">Selected detail</h3>
-                </div>
-                <div class="inspector-drawer__actions">
-                  <button
-                    type="button"
-                    class="ghost-button"
-                    id="inspector-toggle-mode"
-                  >
-                    Float
-                  </button>
-                  <button
-                    type="button"
-                    class="ghost-button"
-                    id="inspector-close"
-                  >
-                    Close
-                  </button>
-                </div>
+        <main class="workspace-shell">
+          <section class="workspace-shell__canvas">
+            <div class="workspace-status-strip">
+              <div class="status-summary-block">
+                <span class="rail-label">What is happening</span>
+                <strong id="status-summary">Waiting for runtime status</strong>
               </div>
-              <div id="inspector-content"></div>
-            </div>
-          </aside>
-          <section id="notification-tray" class="notification-tray" hidden>
-            <div class="notification-tray__surface">
-              <div class="notification-tray__head">
-                <div>
-                  <p class="workspace-kicker">Notifications</p>
-                  <h3>Recent activity and alerts</h3>
+              <div class="status-pill-row">
+                <div class="status-pill-card">
+                  <span>Environment</span>
+                  <strong id="status-environment">Loading</strong>
                 </div>
+                <div class="status-pill-card">
+                  <span>Connection</span>
+                  <strong id="status-connection">Unknown</strong>
+                </div>
+                <div class="status-pill-card">
+                  <span>Sync</span>
+                  <strong id="status-sync">Idle</strong>
+                </div>
+                <button
+                  type="button"
+                  class="status-pill-card status-pill-card--interactive"
+                  id="notification-button"
+                  aria-expanded="false"
+                  aria-controls="notification-tray"
+                >
+                  <span>Notifications</span>
+                  <strong id="status-notifications">0</strong>
+                </button>
               </div>
-              <div id="notification-tray-list" class="notification-tray__list"></div>
             </div>
-          </section>
-          <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
-        </main>
 
-        <footer class="statusbar-shell">
-          <div class="statusbar-group">
-            <span>Environment</span>
-            <strong id="status-environment">Loading</strong>
-          </div>
-          <div class="statusbar-group">
-            <span>Connection</span>
-            <strong id="status-connection">Unknown</strong>
-          </div>
-          <div class="statusbar-group">
-            <span>Sync</span>
-            <strong id="status-sync">Idle</strong>
-          </div>
-          <button
-            type="button"
-            class="statusbar-group statusbar-group--button"
-            id="notification-button"
-            aria-expanded="false"
-            aria-controls="notification-tray"
-          >
-            <span>Notifications</span>
-            <strong id="status-notifications">0</strong>
-          </button>
-        </footer>
+            <div class="workspace-main">
+              <section
+                id="workspace-root"
+                class="workspace-root"
+                aria-live="polite"
+              ></section>
+
+              <aside id="inspector-drawer" class="inspector-drawer" hidden>
+                <div class="inspector-drawer__surface">
+                  <div class="inspector-drawer__head">
+                    <div>
+                      <span class="rail-label">Inspector</span>
+                      <h3 id="inspector-title">Selected detail</h3>
+                    </div>
+                    <div class="inspector-drawer__actions">
+                      <button
+                        type="button"
+                        class="ghost-button"
+                        id="inspector-toggle-mode"
+                      >
+                        Float
+                      </button>
+                      <button
+                        type="button"
+                        class="ghost-button"
+                        id="inspector-close"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                  <div id="inspector-content"></div>
+                </div>
+              </aside>
+            </div>
+
+            <section id="dock-panel" class="dock-panel">
+              <div class="dock-panel__head">
+                <div class="dock-panel__tabs">
+                  <button
+                    type="button"
+                    class="dock-tab is-active"
+                    data-dock-tab="activity"
+                  >
+                    Activity
+                  </button>
+                  <button type="button" class="dock-tab" data-dock-tab="logs">
+                    Logs
+                  </button>
+                  <button type="button" class="dock-tab" data-dock-tab="trace">
+                    Trace
+                  </button>
+                  <button
+                    type="button"
+                    class="dock-tab"
+                    data-dock-tab="notifications"
+                  >
+                    Notifications
+                  </button>
+                </div>
+                <button type="button" class="ghost-button" id="dock-toggle">
+                  Collapse
+                </button>
+              </div>
+              <div id="dock-panel-content" class="dock-panel__content"></div>
+            </section>
+
+            <section id="notification-tray" class="notification-tray" hidden>
+              <div class="notification-tray__surface">
+                <div class="notification-tray__head">
+                  <div>
+                    <span class="rail-label">Notification center</span>
+                    <h3>Recent activity and alerts</h3>
+                  </div>
+                </div>
+                <div
+                  id="notification-tray-list"
+                  class="notification-tray__list"
+                ></div>
+              </div>
+            </section>
+
+            <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+          </section>
+        </main>
       </div>
     </div>
 
@@ -211,14 +321,16 @@
         <div class="command-palette__head">
           <label for="command-query">Search everywhere</label>
           <div class="command-palette__head-actions">
-            <span class="command-palette__hint">↑ ↓ move · ↵ open · esc close</span>
+            <span class="command-palette__hint"
+              >↑ ↓ move · ↵ open · esc close</span
+            >
             <button type="submit" class="ghost-button">Close</button>
           </div>
         </div>
         <input
           id="command-query"
           type="search"
-          placeholder="Jump to diagnostics, open a node, copy an endpoint, rerun a route…"
+          placeholder="Open a node, payment, route, report…"
         />
         <div id="command-results" class="command-results" role="listbox"></div>
       </form>

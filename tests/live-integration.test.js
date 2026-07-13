@@ -6,8 +6,8 @@ import { runDiagnosis } from "../src/lib/diagnostics.js";
 const enabled = process.env.FIBEROPS_LIVE_TESTS === "1";
 const liveEnvReady = Boolean(
   process.env.FIBEROPS_SUCCESS_PAYMENT_HASH &&
-    process.env.FIBEROPS_FAILED_PAYMENT_HASH &&
-    process.env.FIBEROPS_TARGET_PUBKEY
+  process.env.FIBEROPS_FAILED_PAYMENT_HASH &&
+  process.env.FIBEROPS_TARGET_PUBKEY
 );
 const maybeTest = enabled && liveEnvReady ? test : test.skip;
 const nodeSet = [

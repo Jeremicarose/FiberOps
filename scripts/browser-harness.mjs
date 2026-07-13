@@ -150,7 +150,9 @@ function resolveGlobalNodeModules(projectRoot) {
   });
 
   if (result.status !== 0) {
-    throw new Error(result.stderr || "Unable to resolve global node_modules path.");
+    throw new Error(
+      result.stderr || "Unable to resolve global node_modules path."
+    );
   }
 
   return result.stdout.trim();
@@ -166,7 +168,9 @@ async function isKnownSandboxLaunchBlock(playwright, launchError) {
   }
 
   try {
-    const diagnosticBrowser = await playwright.chromium.launch({ headless: true });
+    const diagnosticBrowser = await playwright.chromium.launch({
+      headless: true
+    });
     await diagnosticBrowser.close();
     return false;
   } catch (diagnosticError) {

@@ -1,51 +1,82 @@
 import {
+  renderActionList,
   renderAlertList,
-  renderEmptyState,
+  renderDataTable,
   renderMetricCards,
+  renderPanelHead,
   renderTimelineItems
 } from "./shared.js";
+import { escapeHtml } from "../utils.js";
 
 export function renderOverview(dom, model) {
   dom.workspaceRoot.innerHTML = `
     <section class="workspace-screen workspace-screen--overview">
-      <header class="workspace-header">
+      <header class="workspace-pagehead">
         <div>
-          <p class="workspace-kicker">Overview</p>
-          <h2>System state at a glance</h2>
-          <p>Immediate health, routing posture, and recent operational movement.</p>
+          <span class="rail-label">${escapeHtml(model.hero.eyebrow)}</span>
+          <h2>${escapeHtml(model.hero.title)}</h2>
         </div>
-      </header>
-      <section class="metric-grid">${renderMetricCards(model.metrics)}</section>
-      <section class="workspace-two-up">
-        <div class="panel-surface">
-          <div class="panel-surface__head"><h3>Active alerts</h3></div>
-          <div class="stack-list">${renderAlertList(model.alerts)}</div>
-        </div>
-        <div class="panel-surface">
-          <div class="panel-surface__head"><h3>Quick actions</h3></div>
-          <div class="action-grid">
-            ${model.quickActions
-              .map(
-                (action) => `
-                  <button
-                    type="button"
-                    class="action-tile"
-                    data-quick-action="${action.id}"
-                  >
-                    <strong>${action.label}</strong>
-                    <span>${action.detail}</span>
-                  </button>
-                `
-              )
-              .join("")}
+        <div class="pagehead-badge-cluster">
+          <div class="pagehead-badge">
+            <span>Posture</span>
+            <strong>${escapeHtml(model.hero.status)}</strong>
           </div>
         </div>
+      </header>
+
+      <section class="metrics-grid metrics-grid--four overview-metrics-grid">
+        ${renderMetricCards(model.metrics.slice(0, 4))}
       </section>
-      <section class="panel-surface">
-        <div class="panel-surface__head"><h3>Recent activity</h3></div>
-        <div class="timeline-list">
-          ${model.recentActivity?.length ? renderTimelineItems(model.recentActivity) : renderEmptyState("No activity", "Recent incidents and history-backed changes appear here.")}
-        </div>
+
+      <section class="workspace-grid workspace-grid--two overview-grid overview-grid--primary">
+        <article class="panel-surface">
+          ${renderPanelHead({
+            eyebrow: "Attention",
+            title: "Needs investigation",
+            detail: "Ranked by evidence."
+          })}
+          <div class="stack-list">${renderAlertList(model.attentionQueue.slice(0, 2))}</div>
+        </article>
+
+        <article class="panel-surface">
+          ${renderPanelHead({
+            eyebrow: "Actions",
+            title: "Next steps",
+            detail: "Fast paths into the next workspace."
+          })}
+          ${renderActionList(model.quickActions.slice(0, 3))}
+        </article>
+      </section>
+
+      <section class="workspace-grid workspace-grid--two overview-grid overview-grid--secondary">
+        <article class="panel-surface">
+          ${renderPanelHead({
+            eyebrow: "Node watchlist",
+            title: "Nodes",
+            detail: "Health, outbound, proof."
+          })}
+          ${renderDataTable({
+            columns: [
+              { key: "node", label: "Node" },
+              { key: "health", label: "Health" },
+              { key: "outbound", label: "Outbound" },
+              { key: "proof", label: "Proof" }
+            ],
+            rows: model.nodeWatchlist,
+            emptyTitle: "No nodes",
+            emptyMessage:
+              "Node posture appears here after bootstrap or diagnostics."
+          })}
+        </article>
+
+        <article class="panel-surface">
+          ${renderPanelHead({
+            eyebrow: "Investigations",
+            title: "Recent activity",
+            detail: "Incidents and changes."
+          })}
+          <div class="timeline-list">${renderTimelineItems(model.activeInvestigations)}</div>
+        </article>
       </section>
     </section>
   `;

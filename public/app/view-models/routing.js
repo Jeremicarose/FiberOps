@@ -9,10 +9,28 @@ export function createRoutingViewModel(state) {
   const selectedRoute = routePreview?.chosenRoute || null;
 
   return {
+    hero: {
+      eyebrow: "Route analysis",
+      title:
+        routePreview?.blockingReason ||
+        (routePreview
+          ? "Candidate routes and blockers"
+          : "Preview route posture before you escalate to a full diagnosis"),
+      body: routePreview?.evidenceSource
+        ? `Current preview is backed by ${routePreview.evidenceSource}.`
+        : "Use route analysis to answer why a path fails, which candidate is best, and whether sender perspective changes the outcome.",
+      status: humanize(routePreview?.status || "waiting"),
+      statusTone:
+        routePreview?.status === "ready"
+          ? "positive"
+          : routePreview?.status === "blocked"
+            ? "critical"
+            : "warning"
+    },
     summary: routePreview
       ? [
           {
-            label: "Status",
+            label: "Route state",
             value: humanize(routePreview.status || "unknown"),
             tone:
               routePreview.status === "ready"
@@ -40,7 +58,20 @@ export function createRoutingViewModel(state) {
             tone: "neutral",
             detail: routePreview.estimatedOutbound
               ? `Estimated outbound ${routePreview.estimatedOutbound}`
-              : null
+              : "No sender capacity estimate"
+          },
+          {
+            label: "Candidate count",
+            value: String(routePreview.routeAlternatives?.length || 0),
+            tone:
+              (routePreview.routeAlternatives?.length || 0) > 0
+                ? "positive"
+                : "warning",
+            detail: selectedRoute?.pathPubkeys?.length
+              ? `Chosen path ${selectedRoute.pathPubkeys
+                  .map((pubkey) => shortenHash(pubkey, 10))
+                  .join(" → ")}`
+              : "No chosen route"
           }
         ]
       : [],
@@ -61,10 +92,21 @@ export function createRoutingViewModel(state) {
         reason: candidate.blockingError || null
       })
     ),
+    limitations: routePreview?.limitations || [],
+    blockingReason: routePreview?.blockingReason || null,
+    feeHint: routePreview?.feeHint || null,
+    workflowTips: [
+      "Open this workspace when the route itself is the question.",
+      "Switch to Diagnostics when you need checks, evidence, and operator-facing next actions.",
+      "Compare route candidates before changing node context or retrying the payment."
+    ],
     inspector: selectedRoute
       ? {
           entityType: "route",
-          entityId: selectedRoute.id || selectedRoute.pathPubkeys?.join(":") || "chosen-route",
+          entityId:
+            selectedRoute.id ||
+            selectedRoute.pathPubkeys?.join(":") ||
+            "chosen-route",
           title: "Chosen route",
           subtitle:
             selectedRoute.pathPubkeys
@@ -103,9 +145,6 @@ export function createRoutingViewModel(state) {
             }
           ]
         }
-      : null,
-    limitations: routePreview?.limitations || [],
-    blockingReason: routePreview?.blockingReason || null,
-    feeHint: routePreview?.feeHint || null
+      : null
   };
 }

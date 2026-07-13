@@ -5,11 +5,79 @@ export const WORKSPACES = [
   "overview",
   "nodes",
   "channels",
+  "payments",
   "routing",
   "diagnostics",
   "activity",
+  "logs",
   "testing",
+  "reports",
   "configuration"
+];
+
+export const WORKSPACE_META = {
+  overview: {
+    label: "Overview",
+    section: "Observe",
+    description: "Health and changes"
+  },
+  nodes: {
+    label: "Nodes",
+    section: "Observe",
+    description: "Node posture"
+  },
+  channels: {
+    label: "Channels",
+    section: "Observe",
+    description: "Liquidity and readiness"
+  },
+  payments: {
+    label: "Payments",
+    section: "Observe",
+    description: "History and failures"
+  },
+  routing: {
+    label: "Routes",
+    section: "Explain",
+    description: "Paths and blockers"
+  },
+  diagnostics: {
+    label: "Diagnostics",
+    section: "Explain",
+    description: "Explain a failure"
+  },
+  activity: {
+    label: "Activity",
+    section: "Explain",
+    description: "Incidents and changes"
+  },
+  logs: {
+    label: "Logs",
+    section: "Explain",
+    description: "Events and trace"
+  },
+  testing: {
+    label: "Simulations",
+    section: "Validate",
+    description: "Scenarios and lab"
+  },
+  reports: {
+    label: "Reports",
+    section: "Validate",
+    description: "Export summaries"
+  },
+  configuration: {
+    label: "Settings",
+    section: "Configure",
+    description: "Connections and safety"
+  }
+};
+
+export const DOCK_TABS = [
+  { id: "activity", label: "Activity" },
+  { id: "logs", label: "Logs" },
+  { id: "trace", label: "Trace" },
+  { id: "notifications", label: "Notifications" }
 ];
 
 export const BOOTSTRAP_FALLBACK = {
@@ -43,15 +111,21 @@ export function createInitialState() {
     activePreset: null,
     selectedNodeId: null,
     selectedChannelId: null,
+    selectedPaymentId: null,
     selectedActivityItemId: null,
+    selectedLogId: null,
+    selectedReportId: null,
     workspaceFilters: {
       overview: {},
       nodes: {},
       channels: {},
+      payments: {},
       routing: {},
       diagnostics: {},
       activity: {},
+      logs: {},
       testing: {},
+      reports: {},
       configuration: {}
     },
     diagnosticsDraft: {
@@ -83,9 +157,12 @@ export function createInitialState() {
       loading: false,
       error: null,
       lastActivityLabel: "Waiting for runtime status",
+      theme: "system",
       recentCommands: [],
       notifications: [],
       dismissedNotificationIds: [],
+      dockTab: "activity",
+      dockCollapsed: false,
       inspector: {
         open: false,
         dockMode: "docked",

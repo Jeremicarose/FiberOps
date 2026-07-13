@@ -63,22 +63,24 @@ async function runWorkspaceScenario() {
     );
 
     assert.equal(
-      (await page.locator(".workspace-nav__item.is-active").textContent())?.trim(),
+      (
+        await page.locator(".rail-nav__item.is-active strong").textContent()
+      )?.trim(),
       "Overview"
     );
     assert.match(
       await page.locator("#workspace-root").textContent(),
-      /System state at a glance/i
+      /Network health, route posture, and recent failures in one place/i
     );
 
-    await page.click('[data-nav-workspace="nodes"]');
+    await page.click('.topbar-nav [data-nav-workspace="nodes"]');
     await page.waitForSelector(".workspace-screen--nodes");
     assert.match(
       await page.locator("#workspace-root").textContent(),
-      /Compare configured senders and peers/i
+      /Compare configured sender posture and node health/i
     );
 
-    await page.click('tr[data-row-id]');
+    await page.click("tr[data-row-id]");
     await page.waitForFunction(() => {
       const drawer = document.querySelector("#inspector-drawer");
       return drawer && !drawer.hidden;
@@ -87,13 +89,13 @@ async function runWorkspaceScenario() {
       await page.locator("#inspector-content").textContent(),
       /Health snapshot|Routing posture/i
     );
-    await page.click('#inspector-toggle-mode');
+    await page.click("#inspector-toggle-mode");
     assert.equal(
-      await page.locator('#inspector-drawer').getAttribute('data-mode'),
-      'floating'
+      await page.locator("#inspector-drawer").getAttribute("data-mode"),
+      "floating"
     );
 
-    await page.click('[data-nav-workspace="routing"]');
+    await page.click('.topbar-nav [data-nav-workspace="routing"]');
     await page.fill(
       '#routing-form input[name="targetPubkey"]',
       "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
@@ -101,15 +103,20 @@ async function runWorkspaceScenario() {
     await page.fill('#routing-form input[name="amount"]', "350000000");
     await page.click('#routing-form button[type="submit"]');
     await page.waitForFunction(() => {
-      const text = document.querySelector(".workspace-screen--routing")?.textContent || "";
-      return text.includes("Candidate routes") && /Status|Confidence/.test(text);
+      const text =
+        document.querySelector(".workspace-screen--routing")?.textContent || "";
+      return (
+        text.includes("Candidate routes") && /Status|Confidence/.test(text)
+      );
     });
     await page.waitForFunction(() => {
-      const text = document.querySelector('#status-summary')?.textContent || '';
-      return text.includes('Updated route preview') || text.includes('Route preview');
+      const text = document.querySelector("#status-summary")?.textContent || "";
+      return (
+        text.includes("Updated route preview") || text.includes("Route preview")
+      );
     });
 
-    await page.click('[data-nav-workspace="diagnostics"]');
+    await page.click('.topbar-nav [data-nav-workspace="diagnostics"]');
     await page.selectOption(
       '#diagnostics-form select[name="scenarioId"]',
       "preflight-liquidity-block"
@@ -117,34 +124,90 @@ async function runWorkspaceScenario() {
     await page.click('#diagnostics-form button[type="submit"]');
     await page.waitForFunction(() => {
       const text =
-        document.querySelector(".workspace-screen--diagnostics")?.textContent || "";
+        document.querySelector(".workspace-screen--diagnostics")?.textContent ||
+        "";
       return text.includes("Outbound liquidity is too low");
     });
     await page.waitForFunction(() => {
-      const trayCount = document.querySelector('#status-notifications')?.textContent || '0';
+      const trayCount =
+        document.querySelector("#status-notifications")?.textContent || "0";
       return Number(trayCount) >= 1;
     });
 
-    await page.click('[data-nav-workspace="activity"]');
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+K" : "Control+K"
+    );
+    await page.waitForFunction(
+      () => document.querySelector("#command-palette")?.open === true
+    );
+    await page.fill("#command-query", "activity");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
     await page.waitForSelector(".workspace-screen--activity");
     assert.match(
       await page.locator("#workspace-root").textContent(),
-      /History, incidents, and timeline/i
+      /Review investigations, state changes, and incident history/i
     );
 
-    await page.click('[data-nav-workspace="testing"]');
+    await page.click('.topbar-nav [data-nav-workspace="payments"]');
+    await page.waitForSelector(".workspace-screen--payments");
     assert.match(
       await page.locator("#workspace-root").textContent(),
-      /Guided proof, presets, and local lab flows/i
+      /Search payment history, retries, and failure clusters/i
     );
 
-    await page.click('[data-nav-workspace="configuration"]');
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+K" : "Control+K"
+    );
+    await page.waitForFunction(
+      () => document.querySelector("#command-palette")?.open === true
+    );
+    await page.fill("#command-query", "logs");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".workspace-screen--logs");
     assert.match(
       await page.locator("#workspace-root").textContent(),
-      /Connections, safety controls, and persistence/i
+      /Inspect recent errors, events, and runtime trace/i
     );
 
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+K" : "Control+K"
+    );
+    await page.waitForFunction(
+      () => document.querySelector("#command-palette")?.open === true
+    );
+    await page.fill("#command-query", "simulations");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    assert.match(
+      await page.locator("#workspace-root").textContent(),
+      /Run scenarios and presets/i
+    );
+
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+K" : "Control+K"
+    );
+    await page.waitForFunction(
+      () => document.querySelector("#command-palette")?.open === true
+    );
+    await page.fill("#command-query", "reports");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    assert.match(
+      await page.locator("#workspace-root").textContent(),
+      /Export investigation and network summaries/i
+    );
+
+    await page.click('.topbar-nav [data-nav-workspace="configuration"]');
+    assert.match(
+      await page.locator("#workspace-root").textContent(),
+      /Connections, safety controls, and desktop behavior/i
+    );
+
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+K" : "Control+K"
+    );
     await page.waitForFunction(
       () => document.querySelector("#command-palette")?.open === true
     );
@@ -152,12 +215,17 @@ async function runWorkspaceScenario() {
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => {
-      const tray = document.querySelector('#notification-tray');
+      const tray = document.querySelector("#notification-tray");
       return tray && !tray.hidden;
     });
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+K" : "Control+K"
+    );
     await page.fill("#command-query", "nodes");
-    assert.match(await page.locator("#command-results").textContent(), /Open Nodes/i);
+    assert.match(
+      await page.locator("#command-results").textContent(),
+      /Open Nodes/i
+    );
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
     await page.waitForSelector(".workspace-screen--nodes");
@@ -176,7 +244,7 @@ async function runBootstrapFailureScenario() {
       publicDir,
       handlers: {
         ...createHealthyHandlers(),
-        async bootstrap() {
+        async "/api/bootstrap"() {
           return jsonResponse(503, {
             ok: false,
             error: {
@@ -190,15 +258,23 @@ async function runBootstrapFailureScenario() {
     });
 
     await page.goto("http://fiberops.local/", { waitUntil: "networkidle" });
-    await page.waitForFunction(
-      () => document.querySelector("#bootstrap-badge")?.textContent?.includes("Degraded")
+    await page.waitForFunction(() =>
+      document
+        .querySelector("#bootstrap-badge")
+        ?.textContent?.includes("Degraded")
     );
 
-    assert.equal((await page.locator("#bootstrap-badge").textContent())?.trim(), "Degraded");
-    assert.match(await page.locator("#bootstrap-message").textContent(), /Bootstrap degraded/i);
+    assert.equal(
+      (await page.locator("#bootstrap-badge").textContent())?.trim(),
+      "Degraded"
+    );
+    assert.match(
+      await page.locator("#bootstrap-message").textContent(),
+      /Bootstrap degraded/i
+    );
     assert.match(
       await page.locator("#workspace-root").textContent(),
-      /System state at a glance/i
+      /Network health, route posture, and recent failures in one place/i
     );
   } finally {
     await page.close();
@@ -215,7 +291,7 @@ async function runDiagnoseFailureScenario() {
       publicDir,
       handlers: {
         ...createHealthyHandlers(),
-        async diagnose() {
+        async "/api/diagnose"() {
           return jsonResponse(502, {
             ok: false,
             error: {
@@ -230,11 +306,12 @@ async function runDiagnoseFailureScenario() {
 
     await page.goto("http://fiberops.local/", { waitUntil: "networkidle" });
     await page.setViewportSize({ width: 1024, height: 900 });
-    await page.click('[data-nav-workspace="diagnostics"]');
+    await page.click('.topbar-nav [data-nav-workspace="diagnostics"]');
     await page.click('#diagnostics-form button[type="submit"]');
     await page.waitForFunction(() => {
       const text =
-        document.querySelector(".workspace-screen--diagnostics")?.textContent || "";
+        document.querySelector(".workspace-screen--diagnostics")?.textContent ||
+        "";
       return text.includes("Fiber RPC rejected the request.");
     });
 

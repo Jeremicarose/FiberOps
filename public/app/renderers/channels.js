@@ -1,34 +1,46 @@
-import { renderDataTable } from "./shared.js";
+import {
+  renderDataTable,
+  renderMetricCards,
+  renderPanelHead
+} from "./shared.js";
 
 export function renderChannels(dom, model) {
   dom.workspaceRoot.innerHTML = `
     <section class="workspace-screen workspace-screen--channels">
-      <header class="workspace-header">
+      <header class="workspace-pagehead">
         <div>
-          <p class="workspace-kicker">Channels</p>
-          <h2>Liquidity and channel readiness</h2>
-          <p>Review channel state, local capacity, and likely bottlenecks.</p>
+          <span class="rail-label">Observe / Channels</span>
+          <h2>Inspect liquidity, readiness, and peer-side bottlenecks</h2>
+          <p>Review balance concentration and route-limiting channels.</p>
         </div>
       </header>
-      <div class="workspace-layout workspace-layout--single">
-        <section class="panel-surface">
-          ${renderDataTable({
-            columns: [
-              { key: "channel", label: "Channel" },
-              { key: "state", label: "State" },
-              { key: "node", label: "Node" },
-              { key: "balance", label: "Local balance" },
-              { key: "readiness", label: "Readiness" },
-              { key: "peer", label: "Peer" }
-            ],
-            rows: model.rows,
-            selectedRowId: model.selected?.id,
-            emptyTitle: "No channels available",
-            emptyMessage:
-              "Channel rows appear after bootstrap, live data collection, or node snapshots."
+
+      <section class="metrics-grid metrics-grid--four">
+        ${renderMetricCards(model.metrics)}
+      </section>
+
+      <article class="panel-surface">
+          ${renderPanelHead({
+            eyebrow: "Channel inventory",
+            title: "Tracked channels",
+            detail: "Select a row for balance and route-fit detail."
           })}
-        </section>
-      </div>
+        ${renderDataTable({
+          columns: [
+            { key: "channel", label: "Channel" },
+            { key: "state", label: "State" },
+            { key: "peer", label: "Peer" },
+            { key: "balance", label: "Balances" },
+            { key: "readiness", label: "Readiness" },
+            { key: "capacity", label: "Capacity" }
+          ],
+          rows: model.rows,
+          selectedRowId: model.selected?.id,
+          emptyTitle: "No channels available",
+          emptyMessage:
+            "Channel rows appear after bootstrap, live data collection, or node snapshots."
+        })}
+      </article>
     </section>
   `;
 }

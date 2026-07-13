@@ -1118,7 +1118,8 @@ async function sendStatic(
   publicDir,
   rawRequestUrl = requestPath
 ) {
-  const rawPath = String(rawRequestUrl || requestPath).split("?")[0] || requestPath;
+  const rawPath =
+    String(rawRequestUrl || requestPath).split("?")[0] || requestPath;
   if (rawPath.includes("..")) {
     sendJson(
       response,
@@ -1293,13 +1294,13 @@ function safeRouteFromRequest(request) {
 
 function resolveContainedPath(rootDir, candidatePath) {
   const resolvedRoot = path.resolve(rootDir);
-  const resolvedCandidate = path.resolve(resolvedRoot, `.${candidatePath || ""}`);
+  const resolvedCandidate = path.resolve(
+    resolvedRoot,
+    `.${candidatePath || ""}`
+  );
   const relativePath = path.relative(resolvedRoot, resolvedCandidate);
 
-  if (
-    relativePath.startsWith("..") ||
-    path.isAbsolute(relativePath)
-  ) {
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     return null;
   }
 

@@ -729,7 +729,7 @@ function normalizeRouteBuildCandidate(
     totalAmount:
       totalAmount !== null
         ? formatAmount(totalAmount)
-        : requestedAmount ?? null,
+        : (requestedAmount ?? null),
     totalAmountValue: totalAmount !== null ? totalAmount.toString() : null,
     totalFee: totalFee !== null ? formatAmount(totalFee) : null,
     totalFeeValue: totalFee !== null ? totalFee.toString() : null,

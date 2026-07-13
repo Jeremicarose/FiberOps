@@ -1,25 +1,39 @@
-import { renderDataTable, renderTimelineItems } from "./shared.js";
+import {
+  renderDataTable,
+  renderMetricCards,
+  renderPanelHead,
+  renderTimelineItems
+} from "./shared.js";
 
 export function renderActivity(dom, model) {
   dom.workspaceRoot.innerHTML = `
     <section class="workspace-screen workspace-screen--activity">
-      <header class="workspace-header">
+      <header class="workspace-pagehead">
         <div>
-          <p class="workspace-kicker">Activity</p>
-          <h2>History, incidents, and timeline</h2>
-          <p>Server-backed history and resilient local incident tracking are merged here.</p>
+          <span class="rail-label">Explain / Activity</span>
+          <h2>Review investigations, state changes, and incident history</h2>
+          <p>Review history and investigation changes before opening raw logs.</p>
         </div>
       </header>
-      <div class="workspace-two-up">
-        <section class="panel-surface">
-          <div class="panel-surface__head"><h3>Recent records</h3></div>
+
+      <section class="metrics-grid metrics-grid--three">
+        ${renderMetricCards(model.metrics)}
+      </section>
+
+      <section class="workspace-grid workspace-grid--two">
+        <article class="panel-surface">
+          ${renderPanelHead({
+            eyebrow: "Event ledger",
+            title: "Recent activity",
+            detail:
+              "Select a row to inspect the event in the right-hand inspector."
+          })}
           ${renderDataTable({
             columns: [
-              { key: "timestamp", label: "Timestamp" },
+              { key: "timestamp", label: "Time" },
               { key: "type", label: "Type" },
               { key: "headline", label: "Headline" },
-              { key: "readiness", label: "Readiness" },
-              { key: "source", label: "Source" }
+              { key: "readiness", label: "Readiness" }
             ],
             rows: model.rows,
             selectedRowId: model.selected?.id,
@@ -27,12 +41,16 @@ export function renderActivity(dom, model) {
             emptyMessage:
               "Run diagnostics or load history to populate the activity feed."
           })}
-        </section>
-        <section class="panel-surface">
-          <div class="panel-surface__head"><h3>Timeline</h3></div>
+        </article>
+        <article class="panel-surface">
+          ${renderPanelHead({
+            eyebrow: "Timeline",
+            title: "What changed?",
+            detail: "A condensed stream of changes."
+          })}
           <div class="timeline-list">${renderTimelineItems(model.timeline)}</div>
-        </section>
-      </div>
+        </article>
+      </section>
     </section>
   `;
 }

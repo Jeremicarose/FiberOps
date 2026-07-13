@@ -9,16 +9,82 @@ export function createChannelsViewModel(state) {
     null;
 
   return {
+    metrics: [
+      {
+        label: "Tracked channels",
+        value: String(channels.length),
+        tone: channels.length ? "positive" : "muted",
+        detail: "Liquidity surfaces visible in the active snapshot"
+      },
+      {
+        label: "Ready channels",
+        value: String(
+          channels.filter((channel) =>
+            ["healthy", "ready"].includes(channel.routeReadiness)
+          ).length
+        ),
+        tone: "positive",
+        detail: "Channels currently aligned with payment readiness"
+      },
+      {
+        label: "Bottlenecks",
+        value: String(
+          channels.filter((channel) =>
+            ["blocked", "degraded", "not_ready"].includes(
+              channel.routeReadiness
+            )
+          ).length
+        ),
+        tone: "warning",
+        detail: "Likely route-limiting channels"
+      },
+      {
+        label: "Selected channel",
+        value: selected ? shortenHash(selected.id || "channel", 14) : "None",
+        tone: "neutral",
+        detail: selected?.nodeName || "Choose a channel to inspect"
+      }
+    ],
     rows: channels.map((channel) => ({
       id: channel.id,
       clickable: true,
       cells: {
-        channel: shortenHash(channel.id || "unknown", 18),
-        state: humanize(channel.state || "unknown"),
-        node: channel.nodeName || "Unknown node",
-        balance: channel.localBalance || "Unknown",
-        readiness: humanize(channel.routeReadiness || "unknown"),
-        peer: shortenHash(channel.peerPubkey || "—", 14)
+        channel: {
+          text: shortenHash(channel.id || "unknown", 18),
+          meta: channel.nodeName || "Unknown node"
+        },
+        state: {
+          text: humanize(channel.state || "unknown"),
+          tone: String(channel.state || "")
+            .toLowerCase()
+            .includes("ready")
+            ? "positive"
+            : "warning"
+        },
+        peer: {
+          text: shortenHash(channel.peerPubkey || "—", 14),
+          meta: channel.endpoint || null
+        },
+        balance: {
+          text: channel.localBalance || "Unknown",
+          meta: channel.remoteBalance
+            ? `Remote ${channel.remoteBalance}`
+            : "Remote balance unavailable",
+          mono: true
+        },
+        readiness: {
+          text: humanize(channel.routeReadiness || "unknown"),
+          tone:
+            channel.routeReadiness === "ready"
+              ? "positive"
+              : channel.routeReadiness === "blocked"
+                ? "critical"
+                : "warning"
+        },
+        capacity: {
+          text: channel.capacity || "Unknown",
+          mono: true
+        }
       }
     })),
     selected,
@@ -32,7 +98,10 @@ export function createChannelsViewModel(state) {
             {
               title: "Balance and state",
               fields: [
-                { label: "State", value: humanize(selected.state || "unknown") },
+                {
+                  label: "State",
+                  value: humanize(selected.state || "unknown")
+                },
                 { label: "Capacity", value: selected.capacity || "Unknown" },
                 {
                   label: "Local balance",
@@ -48,10 +117,13 @@ export function createChannelsViewModel(state) {
               title: "Route fit",
               fields: [
                 {
-                  label: "Route readiness",
+                  label: "Readiness",
                   value: humanize(selected.routeReadiness || "unknown")
                 },
-                { label: "Peer pubkey", value: selected.peerPubkey || "Unknown" },
+                {
+                  label: "Peer pubkey",
+                  value: selected.peerPubkey || "Unknown"
+                },
                 { label: "Failure", value: selected.failure || "None" }
               ]
             }

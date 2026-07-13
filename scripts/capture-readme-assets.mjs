@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   attachPageDiagnostics,
+  installRoutes,
   jsonResponse,
   loadPlaywright,
   loadStaticFiles
@@ -57,9 +58,10 @@ async function captureGuidedHome(browser) {
   attachPageDiagnostics(page);
 
   try {
-    await installRoutes(
-      page,
-      createDesktopHandlers({
+    await installRoutes(page, {
+      files,
+      publicDir,
+      handlers: createDesktopHandlers({
         async diagnose(route) {
           const payload = route.request().postDataJSON() || {};
           const result = await runDiagnosis(payload, {
@@ -72,7 +74,7 @@ async function captureGuidedHome(browser) {
           return successResponse("/api/diagnose", result);
         }
       })
-    );
+    });
 
     await page.goto("http://fiberops.local/", { waitUntil: "networkidle" });
     await page.waitForFunction(() =>
@@ -101,9 +103,10 @@ async function captureBlockedRoute(browser) {
   attachPageDiagnostics(page);
 
   try {
-    await installRoutes(
-      page,
-      createDesktopHandlers({
+    await installRoutes(page, {
+      files,
+      publicDir,
+      handlers: createDesktopHandlers({
         async diagnose(route) {
           const payload = route.request().postDataJSON() || {};
           const result = await runDiagnosis(payload, {
@@ -116,7 +119,7 @@ async function captureBlockedRoute(browser) {
           return successResponse("/api/diagnose", result);
         }
       })
-    );
+    });
 
     await page.goto("http://fiberops.local/", { waitUntil: "networkidle" });
     await page.waitForFunction(() =>
@@ -155,9 +158,10 @@ async function captureMultiNodeComparison(browser) {
     "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea";
 
   try {
-    await installRoutes(
-      page,
-      createDesktopHandlers({
+    await installRoutes(page, {
+      files,
+      publicDir,
+      handlers: createDesktopHandlers({
         async diagnose(route) {
           const directory = await mkdtemp(
             path.join(os.tmpdir(), "fiberops-readme-multi-")
@@ -310,7 +314,7 @@ async function captureMultiNodeComparison(browser) {
           return successResponse("/api/diagnose", result);
         }
       })
-    );
+    });
 
     await page.goto("http://fiberops.local/", { waitUntil: "networkidle" });
     await page.waitForFunction(() =>
@@ -376,9 +380,10 @@ async function captureRpcFailure(browser) {
   attachPageDiagnostics(page);
 
   try {
-    await installRoutes(
-      page,
-      createDesktopHandlers({
+    await installRoutes(page, {
+      files,
+      publicDir,
+      handlers: createDesktopHandlers({
         async diagnose() {
           return jsonResponse(502, {
             ok: false,
@@ -396,7 +401,7 @@ async function captureRpcFailure(browser) {
           });
         }
       })
-    );
+    });
 
     await page.goto("http://fiberops.local/", { waitUntil: "networkidle" });
     await page.waitForFunction(() =>
@@ -523,141 +528,12 @@ function createDesktopHandlers(overrides = {}) {
   };
 }
 
-async function installRoutes(page, handlers) {
-  await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
-  await page.route("https://fonts.gstatic.com/**", (route) => route.abort());
-  await page.route("http://fiberops.local/**", async (route) => {
-    const url = new URL(route.request().url());
-
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-      await route.fulfill({
-        status: 200,
-        contentType: "text/html; charset=utf-8",
-        body: files.html
-      });
-      return;
-    }
-
-    if (url.pathname === "/styles.css") {
-      await route.fulfill({
-        status: 200,
-        contentType: "text/css; charset=utf-8",
-        body: files.css
-      });
-      return;
-    }
-
-    if (url.pathname === "/app.js") {
-      await route.fulfill({
-        status: 200,
-        contentType: "text/javascript; charset=utf-8",
-        body: files.js
-      });
-      return;
-    }
-
-    if (url.pathname.startsWith("/app/")) {
-      const modulePath = path.join(publicDir, url.pathname.slice(1));
-      try {
-        const body = await readFile(modulePath, "utf8");
-        await route.fulfill({
-          status: 200,
-          contentType: "text/javascript; charset=utf-8",
-          body
-        });
-      } catch {
-        await route.fulfill({
-          status: 404,
-          contentType: "text/plain; charset=utf-8",
-          body: "Not found"
-        });
-      }
-      return;
-    }
-
-    if (url.pathname === "/api/bootstrap") {
-      await route.fulfill(await handlers.bootstrap(route));
-      return;
-    }
-
-    if (url.pathname === "/api/runtime/status") {
-      await route.fulfill(await handlers.runtimeStatus(route));
-      return;
-    }
-
-    if (url.pathname === "/api/environment") {
-      await route.fulfill(await handlers.environment(route));
-      return;
-    }
-
-    if (url.pathname === "/api/observability") {
-      await route.fulfill(await handlers.observability(route));
-      return;
-    }
-
-    if (url.pathname === "/api/history/status") {
-      await route.fulfill(await handlers.historyStatus(route));
-      return;
-    }
-
-    if (url.pathname === "/api/history/recent") {
-      await route.fulfill(await handlers.historyRecent(route));
-      return;
-    }
-
-    if (url.pathname === "/api/history/related") {
-      await route.fulfill(await handlers.historyRelated(route));
-      return;
-    }
-
-    if (url.pathname === "/api/nodes") {
-      await route.fulfill(await handlers.nodes(route));
-      return;
-    }
-
-    if (url.pathname === "/api/diagnose") {
-      await route.fulfill(await handlers.diagnose(route));
-      return;
-    }
-
-    if (url.pathname === "/api/routing/preview") {
-      await route.fulfill(await handlers.routingPreview(route));
-      return;
-    }
-
-    await route.fulfill({
-      status: 404,
-      contentType: "text/plain; charset=utf-8",
-      body: "Not found"
-    });
-  });
-}
-
-function attachPageDiagnostics(page) {
-  page.on("pageerror", (error) => {
-    console.error("Browser pageerror:", error);
-  });
-  page.on("console", (message) => {
-    if (message.type() === "error") {
-      console.error("Browser console error:", message.text());
-    }
-  });
-}
-
 function successResponse(route, data) {
   return jsonResponse(200, {
     ok: true,
     data,
     meta: { route }
   });
-}
-
-function jsonResponse(status, payload) {
-  return {
-    status,
-    contentType: "application/json; charset=utf-8",
-    body: JSON.stringify(payload)
-  };
 }
 
 function rpcResult(result) {
@@ -699,43 +575,4 @@ function normalizePathPubkeys(hopsInfo) {
       return typeof hop === "string" ? hop : null;
     })
     .filter(Boolean);
-}
-
-async function loadPlaywright() {
-  const directImport = await tryImport("playwright");
-  if (directImport) {
-    return directImport;
-  }
-
-  const npmBin = process.platform === "win32" ? "npm.cmd" : "npm";
-  const result = spawnSync(npmBin, ["root"], {
-    cwd: projectRoot,
-    encoding: "utf8"
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `Unable to resolve local node_modules for Playwright: ${result.stderr || result.stdout}`
-    );
-  }
-
-  const moduleRoot = result.stdout.trim();
-  const fallbackUrl = pathToFileURL(
-    path.join(moduleRoot, "playwright", "index.mjs")
-  ).href;
-  const fallbackImport = await tryImport(fallbackUrl);
-  if (fallbackImport) {
-    return fallbackImport;
-  }
-
-  throw new Error(
-    'Playwright is not installed. Run "npm ci" and "npx playwright install chromium" first.'
-  );
-}
-
-async function tryImport(specifier) {
-  try {
-    return await import(specifier);
-  } catch {
-    return null;
-  }
 }

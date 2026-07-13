@@ -1,8 +1,11 @@
 export { renderOverview } from "./overview.js";
 export { renderNodes } from "./nodes.js";
 export { renderChannels } from "./channels.js";
+export { renderPayments } from "./payments.js";
 export { renderRouting } from "./routing.js";
 export { renderDiagnostics } from "./diagnostics.js";
 export { renderActivity } from "./activity.js";
+export { renderLogs } from "./logs.js";
 export { renderTesting } from "./testing.js";
+export { renderReports } from "./reports.js";
 export { renderConfiguration } from "./configuration.js";

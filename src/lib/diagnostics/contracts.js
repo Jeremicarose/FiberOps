@@ -320,11 +320,15 @@ export function validateDiagnosisRequest(payload = {}) {
     }
 
     if (normalized.amount && !normalized.targetPubkey) {
-      errors.push('Field "targetPubkey" is required when "amount" is provided.');
+      errors.push(
+        'Field "targetPubkey" is required when "amount" is provided.'
+      );
     }
 
     if (normalized.targetPubkey && !normalized.amount) {
-      errors.push('Field "amount" is required when "targetPubkey" is provided.');
+      errors.push(
+        'Field "amount" is required when "targetPubkey" is provided.'
+      );
     }
   }
 

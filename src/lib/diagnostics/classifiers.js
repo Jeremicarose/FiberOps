@@ -185,7 +185,15 @@ export function buildDiagnosis({
 
   addRouteProbeFindings(checks, evidence, routeProbe);
   addRouteBuildFindings(checks, evidence, routeBuild);
-  addGraphFindings(checks, evidence, context, targetPubkey, graphMatch, routeProbe, routeBuild);
+  addGraphFindings(
+    checks,
+    evidence,
+    context,
+    targetPubkey,
+    graphMatch,
+    routeProbe,
+    routeBuild
+  );
   addPeerIdFinding(checks, evidence, request.targetPubkey);
 
   let classification = {

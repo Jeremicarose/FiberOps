@@ -1,6 +1,8 @@
 import { requestApi } from "./app/api.js";
 import {
   BOOTSTRAP_FALLBACK,
+  DOCK_TABS,
+  WORKSPACE_META,
   WORKSPACES,
   createInitialState
 } from "./app/constants.js";
@@ -15,8 +17,11 @@ import {
   renderChannels,
   renderConfiguration,
   renderDiagnostics,
+  renderLogs,
   renderNodes,
   renderOverview,
+  renderPayments,
+  renderReports,
   renderRouting,
   renderTesting
 } from "./app/renderers/index.js";
@@ -24,8 +29,11 @@ import {
   createActivityViewModel,
   createChannelsViewModel,
   createDiagnosticsViewModel,
+  createLogsViewModel,
   createNodesViewModel,
   createOverviewViewModel,
+  createPaymentsViewModel,
+  createReportsViewModel,
   createRoutingViewModel
 } from "./app/view-models/index.js";
 import {
@@ -38,7 +46,8 @@ import {
   renderEmptyState,
   renderInspectorBody,
   renderInspectorSection,
-  renderKeyValueList
+  renderKeyValueList,
+  renderTimelineItems
 } from "./app/renderers/shared.js";
 
 const STORAGE_KEY = "fiberops:desktop-state";
@@ -48,15 +57,22 @@ const MAX_NOTIFICATION_ITEMS = 24;
 const MAX_TOASTS = 3;
 const TOAST_DURATION_MS = 2600;
 const VIEWPORT_WIDE_QUERY = "(min-width: 1180px)";
+const DOCK_VISIBLE_WORKSPACES = new Set([
+  "diagnostics",
+  "routing",
+  "activity",
+  "logs"
+]);
 const WORKSPACE_SHORTCUTS = {
-  "1": "overview",
-  "2": "nodes",
-  "3": "channels",
-  "4": "routing",
-  "5": "diagnostics",
-  "6": "activity",
-  "7": "testing",
-  "8": "configuration"
+  1: "overview",
+  2: "nodes",
+  3: "channels",
+  4: "payments",
+  5: "routing",
+  6: "diagnostics",
+  7: "activity",
+  8: "logs",
+  9: "testing"
 };
 
 const state = createInitialState();
@@ -64,6 +80,7 @@ const dom = getDom(state);
 let disposeHistorySync = null;
 let globalEventsBound = false;
 let viewportWideMedia = null;
+let themeMedia = null;
 let lastFocusedElement = null;
 let pendingFocusRowId = null;
 
@@ -71,6 +88,8 @@ void boot();
 
 async function boot() {
   restoreUiState();
+  bindThemeMedia();
+  applyTheme();
   bindEvents();
   syncInspectorDockModeForViewport();
   render();
@@ -114,6 +133,11 @@ function bindEvents() {
       setMode(button.dataset.modeButton);
     });
   });
+  dom.themeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setTheme(button.dataset.themeButton);
+    });
+  });
 
   if (!globalEventsBound) {
     dom.commandPaletteButton?.addEventListener("click", openCommandPalette);
@@ -125,9 +149,21 @@ function bindEvents() {
     dom.commandResults?.addEventListener("mousemove", onCommandResultHover);
     dom.commandPalette?.addEventListener("close", onCommandPaletteClose);
     dom.notificationButton?.addEventListener("click", toggleNotificationsTray);
-    dom.notificationTrayList?.addEventListener("click", onNotificationTrayClick);
+    dom.notificationTrayList?.addEventListener(
+      "click",
+      onNotificationTrayClick
+    );
     dom.inspectorCloseButton?.addEventListener("click", closeInspector);
-    dom.inspectorToggleButton?.addEventListener("click", toggleInspectorDockMode);
+    dom.inspectorToggleButton?.addEventListener(
+      "click",
+      toggleInspectorDockMode
+    );
+    dom.dockTabButtons?.forEach((button) => {
+      button.addEventListener("click", () => {
+        setDockTab(button.dataset.dockTab);
+      });
+    });
+    dom.dockToggleButton?.addEventListener("click", toggleDockPanel);
 
     document.addEventListener("click", onDocumentClick);
     document.addEventListener("keydown", onDocumentKeydown);
@@ -153,7 +189,39 @@ function bindEvents() {
   });
 }
 
+function bindThemeMedia() {
+  if (themeMedia || !globalThis.matchMedia) {
+    return;
+  }
+
+  themeMedia = globalThis.matchMedia("(prefers-color-scheme: dark)");
+  themeMedia.addEventListener?.("change", () => {
+    if (state.ui.theme === "system") {
+      applyTheme();
+      render();
+    }
+  });
+}
+
+function applyTheme() {
+  const resolvedTheme =
+    state.ui.theme === "system"
+      ? themeMedia?.matches
+        ? "dark"
+        : "light"
+      : state.ui.theme;
+
+  document.documentElement.dataset.theme = resolvedTheme;
+  document.documentElement.dataset.themePreference = state.ui.theme;
+}
+
 function onWorkspaceClick(event) {
+  const dockTabTrigger = event.target.closest("[data-dock-tab]");
+  if (dockTabTrigger) {
+    setDockTab(dockTabTrigger.dataset.dockTab);
+    return;
+  }
+
   const navTrigger = event.target.closest("[data-nav-workspace]");
   if (navTrigger) {
     setActiveWorkspace(navTrigger.dataset.navWorkspace);
@@ -181,6 +249,12 @@ function onWorkspaceClick(event) {
   if (configTrigger) {
     setActiveWorkspace("diagnostics");
     render();
+    return;
+  }
+
+  const reportExportTrigger = event.target.closest("[data-report-export]");
+  if (reportExportTrigger) {
+    exportReport(reportExportTrigger.dataset.reportExport);
     return;
   }
 
@@ -245,7 +319,8 @@ function onDocumentKeydown(event) {
       return;
     }
     if (event.key === "Enter") {
-      const activeEntry = getVisibleCommandEntries()[state.ui.commandPaletteIndex];
+      const activeEntry =
+        getVisibleCommandEntries()[state.ui.commandPaletteIndex];
       if (activeEntry) {
         event.preventDefault();
         executeCommandEntry(activeEntry);
@@ -273,7 +348,8 @@ function onWorkspaceRowKeydown(event) {
   }
 
   const rows = Array.from(
-    row.closest("tbody")?.querySelectorAll('tr[data-row-id][role="button"]') || []
+    row.closest("tbody")?.querySelectorAll('tr[data-row-id][role="button"]') ||
+      []
   );
   const index = rows.indexOf(row);
 
@@ -313,6 +389,14 @@ function onWorkspaceChange(event) {
 
   if (form.id === "routing-form") {
     persistRoutingDraft(new FormData(form));
+    return;
+  }
+
+  if (form.id === "configuration-form") {
+    const themeSelect = form.elements["theme"];
+    if (themeSelect) {
+      setTheme(themeSelect.value);
+    }
   }
 }
 
@@ -355,7 +439,8 @@ function restoreUiState() {
     if (saved.diagnosticsDraft && typeof saved.diagnosticsDraft === "object") {
       state.diagnosticsDraft = {
         ...state.diagnosticsDraft,
-        ...saved.diagnosticsDraft
+        ...saved.diagnosticsDraft,
+        token: ""
       };
     }
     if (saved.routingDraft && typeof saved.routingDraft === "object") {
@@ -370,8 +455,17 @@ function restoreUiState() {
     if (typeof saved.selectedChannelId === "string") {
       state.selectedChannelId = saved.selectedChannelId;
     }
+    if (typeof saved.selectedPaymentId === "string") {
+      state.selectedPaymentId = saved.selectedPaymentId;
+    }
     if (typeof saved.selectedActivityItemId === "string") {
       state.selectedActivityItemId = saved.selectedActivityItemId;
+    }
+    if (typeof saved.selectedLogId === "string") {
+      state.selectedLogId = saved.selectedLogId;
+    }
+    if (typeof saved.selectedReportId === "string") {
+      state.selectedReportId = saved.selectedReportId;
     }
     if (saved.ui && typeof saved.ui === "object") {
       state.ui.recentCommands = Array.isArray(saved.ui.recentCommands)
@@ -388,6 +482,19 @@ function restoreUiState() {
           ...saved.ui.inspector
         };
       }
+      if (typeof saved.ui.dockTab === "string") {
+        state.ui.dockTab = saved.ui.dockTab;
+      }
+      if (typeof saved.ui.dockCollapsed === "boolean") {
+        state.ui.dockCollapsed = saved.ui.dockCollapsed;
+      }
+      if (
+        saved.ui.theme === "system" ||
+        saved.ui.theme === "light" ||
+        saved.ui.theme === "dark"
+      ) {
+        state.ui.theme = saved.ui.theme;
+      }
     }
   } catch {
     // ignore persisted state failures
@@ -400,14 +507,23 @@ function persistUiState() {
     JSON.stringify({
       activeWorkspace: state.activeWorkspace,
       mode: state.mode,
-      diagnosticsDraft: state.diagnosticsDraft,
+      diagnosticsDraft: {
+        ...state.diagnosticsDraft,
+        token: ""
+      },
       routingDraft: state.routingDraft,
       selectedNodeId: state.selectedNodeId,
       selectedChannelId: state.selectedChannelId,
+      selectedPaymentId: state.selectedPaymentId,
       selectedActivityItemId: state.selectedActivityItemId,
+      selectedLogId: state.selectedLogId,
+      selectedReportId: state.selectedReportId,
       ui: {
         recentCommands: state.ui.recentCommands,
         dismissedNotificationIds: state.ui.dismissedNotificationIds,
+        dockTab: state.ui.dockTab,
+        dockCollapsed: state.ui.dockCollapsed,
+        theme: state.ui.theme,
         inspector: {
           open: state.ui.inspector.open,
           dockMode: state.ui.inspector.dockMode,
@@ -437,12 +553,22 @@ function setMode(mode) {
   render();
 }
 
+function setTheme(theme) {
+  if (!["system", "light", "dark"].includes(theme)) {
+    return;
+  }
+  state.ui.theme = theme;
+  applyTheme();
+  persistUiState();
+  render();
+}
+
 function setActiveWorkspace(workspace) {
   if (!WORKSPACES.includes(workspace)) {
     return;
   }
   state.activeWorkspace = workspace;
-  state.ui.lastActivityLabel = `Opened ${humanize(workspace)} workspace`;
+  state.ui.lastActivityLabel = `Opened ${getWorkspaceMeta(workspace).label}`;
   if (state.ui.notificationsTrayOpen) {
     state.ui.notificationsTrayOpen = false;
   }
@@ -670,7 +796,10 @@ async function submitDiagnostics(form) {
       });
     }
 
-    const serverRelated = await safeRequestHistoryRelated(result.event?.id, requestId);
+    const serverRelated = await safeRequestHistoryRelated(
+      result.event?.id,
+      requestId
+    );
     if (!isActiveRequest(requestId)) {
       return;
     }
@@ -681,7 +810,9 @@ async function submitDiagnostics(form) {
       result.diagnosis?.headline || "Completed diagnostics run";
     openInspectorForCurrentWorkspace();
     pushNotification({
-      kind: toneToNotificationKind(result.diagnosis?.severity || result.summary?.paymentReadiness),
+      kind: toneToNotificationKind(
+        result.diagnosis?.severity || result.summary?.paymentReadiness
+      ),
       title: "Diagnostics updated",
       message:
         result.diagnosis?.headline ||
@@ -789,7 +920,10 @@ function buildDiagnosticsPayload() {
   return compactObject(payload);
 }
 
-async function safeRequestHistoryRelated(eventId, requestId = state.activeRequestId) {
+async function safeRequestHistoryRelated(
+  eventId,
+  requestId = state.activeRequestId
+) {
   if (!eventId || !isActiveRequest(requestId)) {
     return { recent: state.activitySnapshot.server || [], related: [] };
   }
@@ -877,8 +1011,14 @@ function handleRowSelection(rowId) {
     state.selectedNodeId = rowId;
   } else if (state.activeWorkspace === "channels") {
     state.selectedChannelId = rowId;
+  } else if (state.activeWorkspace === "payments") {
+    state.selectedPaymentId = rowId;
   } else if (state.activeWorkspace === "activity") {
     state.selectedActivityItemId = rowId;
+  } else if (state.activeWorkspace === "logs") {
+    state.selectedLogId = rowId;
+  } else if (state.activeWorkspace === "reports") {
+    state.selectedReportId = rowId;
   }
 
   openInspectorForCurrentWorkspace();
@@ -900,6 +1040,9 @@ function render() {
     case "channels":
       renderChannels(dom, createChannelsViewModel(state));
       break;
+    case "payments":
+      renderPayments(dom, createPaymentsViewModel(state));
+      break;
     case "routing":
       renderRouting(dom, createRoutingViewModel(state));
       break;
@@ -909,8 +1052,14 @@ function render() {
     case "activity":
       renderActivity(dom, createActivityViewModel(state));
       break;
+    case "logs":
+      renderLogs(dom, createLogsViewModel(state));
+      break;
     case "testing":
       renderTesting(dom, state);
+      break;
+    case "reports":
+      renderReports(dom, createReportsViewModel(state));
       break;
     case "configuration":
       renderConfiguration(dom, state);
@@ -923,6 +1072,7 @@ function render() {
   renderNotificationsTray();
   renderToasts();
   renderCommandPaletteResults();
+  renderDockPanel();
   focusSelectedRowIfNeeded();
 }
 
@@ -939,6 +1089,25 @@ function updateChrome() {
       button.dataset.modeButton === state.mode
     );
   });
+  dom.themeButtons.forEach((button) => {
+    button.classList.toggle(
+      "is-active",
+      button.dataset.themeButton === state.ui.theme
+    );
+  });
+
+  dom.dockTabButtons?.forEach((button) => {
+    button.classList.toggle(
+      "is-active",
+      button.dataset.dockTab === state.ui.dockTab
+    );
+  });
+  dom.dockPanel?.classList.toggle("is-collapsed", state.ui.dockCollapsed);
+  if (dom.dockToggleButton) {
+    dom.dockToggleButton.textContent = state.ui.dockCollapsed
+      ? "Expand"
+      : "Collapse";
+  }
 
   const bootstrapReady = state.bootstrapState === "ready";
   const badgeLabel =
@@ -951,12 +1120,15 @@ function updateChrome() {
   dom.bootstrapBadge.dataset.bootstrapState = state.bootstrapState;
   dom.bootstrapMessage.textContent =
     state.bootstrapState === "failed"
-      ? `Bootstrap degraded: ${state.bootstrapError?.message || "initial payload unavailable"}.`
+      ? `Bootstrap degraded: ${
+          state.bootstrapError?.message || "initial payload unavailable"
+        }.`
       : bootstrapReady
-        ? "Workspace shell is ready. Dedicated runtime, history, and node surfaces are available."
+        ? "Connected. Node, payment, routing, and history surfaces are ready."
         : "Loading bootstrap payload and runtime context.";
   dom.bootstrapMessage.dataset.bootstrapState = state.bootstrapState;
 
+  const workspaceMeta = getWorkspaceMeta(state.activeWorkspace);
   const runtime = state.runtimeStatus || {};
   const observability = state.observability || runtime.observability || {};
   const recentErrors = observability.requests?.recent?.errors || 0;
@@ -968,9 +1140,16 @@ function updateChrome() {
       ? "Degraded bootstrap · cached workspace context stays available"
       : recentErrors > 0
         ? `${recentErrors} recent request error(s) · inspect notifications`
-        : state.ui.lastActivityLabel || `${humanize(state.activeWorkspace)} workspace ready`;
+        : state.ui.lastActivityLabel ||
+          `${workspaceMeta.label} workspace ready`;
 
   dom.statusSummary.textContent = summaryMessage;
+  if (dom.workspaceLabel) {
+    dom.workspaceLabel.textContent = workspaceMeta.label;
+  }
+  if (dom.workspaceDescription) {
+    dom.workspaceDescription.textContent = workspaceMeta.description;
+  }
   dom.statusEnvironment.textContent =
     state.environment?.name ||
     state.bootstrap?.environmentFacts?.name ||
@@ -995,8 +1174,7 @@ function updateChrome() {
     state.ui.notificationsTrayOpen
   );
   if (dom.commandPaletteButton) {
-    dom.commandPaletteButton.title =
-      "Search everywhere (⌘K / Ctrl+K)";
+    dom.commandPaletteButton.title = "Search everywhere (⌘K / Ctrl+K)";
   }
 }
 
@@ -1027,7 +1205,8 @@ function moveCommandPaletteSelection(direction) {
     return;
   }
   const nextIndex =
-    (state.ui.commandPaletteIndex + direction + entries.length) % entries.length;
+    (state.ui.commandPaletteIndex + direction + entries.length) %
+    entries.length;
   state.ui.commandPaletteIndex = nextIndex;
   renderCommandPaletteResults();
 }
@@ -1113,7 +1292,8 @@ function onCommandPaletteClick(event) {
   if (!item) {
     return;
   }
-  const entry = getVisibleCommandEntries()[Number(item.dataset.commandIndex || 0)];
+  const entry =
+    getVisibleCommandEntries()[Number(item.dataset.commandIndex || 0)];
   if (entry) {
     executeCommandEntry(entry);
   }
@@ -1132,10 +1312,22 @@ function executeCommandEntry(entry) {
     state.selectedChannelId = entry.value;
     setActiveWorkspace("channels");
     openInspectorForEntity("channel", entry.value, true);
+  } else if (entry.action === "payment") {
+    state.selectedPaymentId = entry.value;
+    setActiveWorkspace("payments");
+    openInspectorForEntity("payment", entry.value, true);
   } else if (entry.action === "activity") {
     state.selectedActivityItemId = entry.value;
     setActiveWorkspace("activity");
     openInspectorForEntity("activity", entry.value, true);
+  } else if (entry.action === "log") {
+    state.selectedLogId = entry.value;
+    setActiveWorkspace("logs");
+    openInspectorForEntity("log", entry.value, true);
+  } else if (entry.action === "report") {
+    state.selectedReportId = entry.value;
+    setActiveWorkspace("reports");
+    openInspectorForEntity("report", entry.value, true);
   } else if (entry.action === "copy") {
     copyToClipboard(entry.value || "", entry.label);
   } else if (entry.action === "quick-action") {
@@ -1160,11 +1352,12 @@ function buildCommandEntries() {
   }
 
   for (const workspace of WORKSPACES) {
+    const workspaceMeta = getWorkspaceMeta(workspace);
     entries.push({
       action: "workspace",
       value: workspace,
-      label: `Open ${humanize(workspace)}`,
-      detail: `Jump to ${workspace} workspace`,
+      label: `Open ${workspaceMeta.label}`,
+      detail: workspaceMeta.description,
       group: "Workspaces"
     });
   }
@@ -1198,6 +1391,16 @@ function buildCommandEntries() {
     });
   }
 
+  for (const payment of createPaymentsViewModel(state).rows.slice(0, 8)) {
+    entries.push({
+      action: "payment",
+      value: payment.id,
+      label: `Inspect payment ${payment.cells.payment?.text || payment.id}`,
+      detail: payment.cells.reason?.text || "Payment history item",
+      group: "Payments"
+    });
+  }
+
   for (const item of (state.activitySnapshot?.items || []).slice(0, 8)) {
     entries.push({
       action: "activity",
@@ -1205,6 +1408,26 @@ function buildCommandEntries() {
       label: item.title,
       detail: `${item.timestampLabel} · ${humanize(item.source || "activity")}`,
       group: "Activity"
+    });
+  }
+
+  for (const log of createLogsViewModel(state).rows.slice(0, 6)) {
+    entries.push({
+      action: "log",
+      value: log.id,
+      label: `Inspect log ${log.cells.subsystem?.text || log.id}`,
+      detail: log.cells.message?.text || "Runtime event",
+      group: "Logs"
+    });
+  }
+
+  for (const report of createReportsViewModel(state).rows) {
+    entries.push({
+      action: "report",
+      value: report.id,
+      label: report.cells.report?.text || "Open report",
+      detail: report.cells.summary?.text || "Exportable report",
+      group: "Reports"
     });
   }
 
@@ -1287,9 +1510,14 @@ function rememberRecentCommand(entry) {
     detail: entry.detail,
     group: entry.group
   };
-  state.ui.recentCommands = [normalized, ...state.ui.recentCommands.filter((item) => {
-    return !(item.action === normalized.action && item.value === normalized.value);
-  })].slice(0, MAX_RECENT_COMMANDS);
+  state.ui.recentCommands = [
+    normalized,
+    ...state.ui.recentCommands.filter((item) => {
+      return !(
+        item.action === normalized.action && item.value === normalized.value
+      );
+    })
+  ].slice(0, MAX_RECENT_COMMANDS);
   persistUiState();
 }
 
@@ -1299,12 +1527,29 @@ function runQuickAction(actionId, options = {}) {
       setActiveWorkspace("diagnostics");
       state.ui.lastActivityLabel = "Opened diagnostics with current draft";
       break;
+    case "go-payments":
+      setActiveWorkspace("payments");
+      openInspectorForEntity(
+        "payment",
+        state.selectedPaymentId ||
+          createPaymentsViewModel(state).selected?.id ||
+          null,
+        true
+      );
+      state.ui.lastActivityLabel = "Opened payment history";
+      break;
     case "go-routing":
-      if (state.diagnosticsDraft.targetPubkey && !state.routingDraft.targetPubkey) {
+      if (
+        state.diagnosticsDraft.targetPubkey &&
+        !state.routingDraft.targetPubkey
+      ) {
         state.routingDraft.targetPubkey = state.diagnosticsDraft.targetPubkey;
       }
       if (state.diagnosticsDraft.amount && !state.routingDraft.amount) {
         state.routingDraft.amount = state.diagnosticsDraft.amount;
+      }
+      if (state.diagnosticsDraft.invoice && !state.routingDraft.invoice) {
+        state.routingDraft.invoice = state.diagnosticsDraft.invoice;
       }
       setActiveWorkspace("routing");
       state.ui.lastActivityLabel = "Opened routing with last target";
@@ -1313,6 +1558,35 @@ function runQuickAction(actionId, options = {}) {
       setActiveWorkspace("nodes");
       openInspectorForEntity("node", state.selectedNodeId, true);
       state.ui.lastActivityLabel = "Opened selected node inspector";
+      break;
+    case "go-channels":
+      setActiveWorkspace("channels");
+      openInspectorForEntity("channel", state.selectedChannelId, true);
+      state.ui.lastActivityLabel = "Opened channel readiness view";
+      break;
+    case "go-logs":
+      setActiveWorkspace("logs");
+      openInspectorForEntity(
+        "log",
+        state.selectedLogId || createLogsViewModel(state).selected?.id || null,
+        true
+      );
+      state.ui.lastActivityLabel = "Opened runtime logs";
+      break;
+    case "go-testing":
+      setActiveWorkspace("testing");
+      state.ui.lastActivityLabel = "Opened simulations and presets";
+      break;
+    case "go-reports":
+      setActiveWorkspace("reports");
+      openInspectorForEntity(
+        "report",
+        state.selectedReportId ||
+          createReportsViewModel(state).selected?.id ||
+          null,
+        true
+      );
+      state.ui.lastActivityLabel = "Opened exportable reports";
       break;
     case "go-activity":
       setActiveWorkspace("activity");
@@ -1428,7 +1702,9 @@ function renderToasts() {
   if (!dom.toastStack) {
     return;
   }
-  const toasts = state.ui.notifications.filter((item) => item.toast).slice(0, MAX_TOASTS);
+  const toasts = state.ui.notifications
+    .filter((item) => item.toast)
+    .slice(0, MAX_TOASTS);
   dom.toastStack.innerHTML = toasts
     .map(
       (item) => `
@@ -1439,6 +1715,149 @@ function renderToasts() {
       `
     )
     .join("");
+}
+
+function renderDockPanel() {
+  if (!dom.dockPanel || !dom.dockPanelContent) {
+    return;
+  }
+
+  const dockVisible = DOCK_VISIBLE_WORKSPACES.has(state.activeWorkspace);
+  dom.dockPanel.hidden = !dockVisible;
+  if (!dockVisible) {
+    dom.dockPanelContent.innerHTML = "";
+    return;
+  }
+
+  dom.dockPanel.classList.toggle("is-collapsed", state.ui.dockCollapsed);
+  if (state.ui.dockCollapsed) {
+    dom.dockPanelContent.innerHTML = "";
+    return;
+  }
+
+  switch (state.ui.dockTab) {
+    case "logs":
+      dom.dockPanelContent.innerHTML = renderDockLogs();
+      break;
+    case "trace":
+      dom.dockPanelContent.innerHTML = renderDockTrace();
+      break;
+    case "notifications":
+      dom.dockPanelContent.innerHTML = renderDockNotifications();
+      break;
+    case "activity":
+    default:
+      dom.dockPanelContent.innerHTML = renderDockActivity();
+      break;
+  }
+}
+
+function renderDockActivity() {
+  const items = (state.activitySnapshot?.items || [])
+    .slice(0, 5)
+    .map((item) => ({
+      title: item.title,
+      message: item.message,
+      timestamp: item.timestamp,
+      severity: item.severity || item.status,
+      tags: item.tags || []
+    }));
+
+  return items.length
+    ? `<div class="dock-timeline">${renderTimelineItems(items)}</div>`
+    : renderEmptyState(
+        "No recent activity",
+        "Diagnostics runs, history events, and incident bookmarks appear here."
+      );
+}
+
+function renderDockLogs() {
+  const logItems = createLogsViewModel(state).rows.slice(0, 8);
+  if (!logItems.length) {
+    return renderEmptyState(
+      "No log entries",
+      "Runtime events and partial RPC failures appear here."
+    );
+  }
+
+  return `
+    <div class="dock-log-list">
+      ${logItems
+        .map(
+          (item) => `
+            <article class="dock-log-entry">
+              <div class="dock-log-entry__meta">
+                <span>${escapeHtml(item.cells.level?.text || "Info")}</span>
+                <span>${escapeHtml(item.cells.time?.text || "")}</span>
+              </div>
+              <strong>${escapeHtml(item.cells.subsystem?.text || "Runtime")}</strong>
+              <p>${escapeHtml(item.cells.message?.text || "")}</p>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderDockTrace() {
+  const trace = state.lastExecutionPlan || state.lastDiagnosisResult || null;
+  if (!trace) {
+    return renderEmptyState(
+      "No active trace",
+      "Run route analysis or diagnostics to inspect the latest execution payload."
+    );
+  }
+
+  return `
+    <pre class="code-panel code-panel--dock">${escapeHtml(
+      JSON.stringify(trace, null, 2)
+    )}</pre>
+  `;
+}
+
+function renderDockNotifications() {
+  const notifications = getVisibleNotifications().slice(0, 8);
+  if (!notifications.length) {
+    return renderEmptyState(
+      "No notifications",
+      "Short-lived feedback and degraded-state alerts appear here."
+    );
+  }
+
+  return `
+    <div class="dock-log-list">
+      ${notifications
+        .map(
+          (item) => `
+            <article class="dock-log-entry">
+              <div class="dock-log-entry__meta">
+                <span>${escapeHtml(humanize(item.kind))}</span>
+                <span>${escapeHtml(formatTimestamp(item.timestamp))}</span>
+              </div>
+              <strong>${escapeHtml(item.title)}</strong>
+              <p>${escapeHtml(item.message)}</p>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function setDockTab(tab) {
+  if (!DOCK_TABS.some((item) => item.id === tab)) {
+    return;
+  }
+  state.ui.dockTab = tab;
+  persistUiState();
+  render();
+}
+
+function toggleDockPanel() {
+  state.ui.dockCollapsed = !state.ui.dockCollapsed;
+  persistUiState();
+  render();
 }
 
 function dismissNotification(notificationId) {
@@ -1504,7 +1923,8 @@ function closeInspector() {
 }
 
 function toggleInspectorDockMode() {
-  const nextMode = state.ui.inspector.preferredDockMode === "docked" ? "floating" : "docked";
+  const nextMode =
+    state.ui.inspector.preferredDockMode === "docked" ? "floating" : "docked";
   state.ui.inspector.preferredDockMode = nextMode;
   syncInspectorDockModeForViewport();
   persistUiState();
@@ -1514,16 +1934,28 @@ function toggleInspectorDockMode() {
 function syncInspectorDockModeForViewport() {
   const prefersDocked = state.ui.inspector.preferredDockMode !== "floating";
   const canDock = viewportWideMedia?.matches ?? true;
-  state.ui.inspector.dockMode = prefersDocked && canDock ? "docked" : "floating";
+  state.ui.inspector.dockMode =
+    prefersDocked && canDock ? "docked" : "floating";
 }
 
 function openInspectorForCurrentWorkspace() {
   if (state.activeWorkspace === "nodes") {
-    openInspectorForEntity("node", state.selectedNodeId || state.nodesSnapshot?.nodes?.[0]?.id, false);
+    openInspectorForEntity(
+      "node",
+      state.selectedNodeId || state.nodesSnapshot?.nodes?.[0]?.id,
+      false
+    );
   } else if (state.activeWorkspace === "channels") {
     openInspectorForEntity(
       "channel",
       state.selectedChannelId || state.channelsSnapshot?.channels?.[0]?.id,
+      false
+    );
+  } else if (state.activeWorkspace === "payments") {
+    const paymentsModel = createPaymentsViewModel(state);
+    openInspectorForEntity(
+      "payment",
+      state.selectedPaymentId || paymentsModel.selected?.id || null,
       false
     );
   } else if (state.activeWorkspace === "activity") {
@@ -1532,17 +1964,37 @@ function openInspectorForCurrentWorkspace() {
       state.selectedActivityItemId || state.activitySnapshot?.items?.[0]?.id,
       false
     );
+  } else if (state.activeWorkspace === "logs") {
+    const logsModel = createLogsViewModel(state);
+    openInspectorForEntity(
+      "log",
+      state.selectedLogId || logsModel.selected?.id || null,
+      false
+    );
   } else if (state.activeWorkspace === "routing") {
-    const route = state.lastExecutionPlan?.routePreview?.chosenRoute || state.lastDiagnosisResult?.routePreview?.chosenRoute;
+    const route =
+      state.lastExecutionPlan?.routePreview?.chosenRoute ||
+      state.lastDiagnosisResult?.routePreview?.chosenRoute;
     openInspectorForEntity(
       "route",
       route?.id || route?.pathPubkeys?.join(":") || null,
       false
     );
+  } else if (state.activeWorkspace === "reports") {
+    const reportsModel = createReportsViewModel(state);
+    openInspectorForEntity(
+      "report",
+      state.selectedReportId || reportsModel.selected?.id || null,
+      false
+    );
   }
 }
 
-function openInspectorForEntity(entityType, entityId, preserveLastFocus = true) {
+function openInspectorForEntity(
+  entityType,
+  entityId,
+  preserveLastFocus = true
+) {
   if (!entityType || !entityId) {
     return;
   }
@@ -1575,9 +2027,11 @@ function renderInspector() {
     return;
   }
 
-  document.querySelector("#inspector-title")?.replaceChildren(
-    document.createTextNode(inspector.title || "Selected detail")
-  );
+  document
+    .querySelector("#inspector-title")
+    ?.replaceChildren(
+      document.createTextNode(inspector.title || "Selected detail")
+    );
   if (dom.inspectorToggleButton) {
     dom.inspectorToggleButton.textContent =
       state.ui.inspector.preferredDockMode === "docked" ? "Float" : "Dock";
@@ -1595,18 +2049,27 @@ function renderInspector() {
 function buildInspectorModel() {
   const nodesModel = createNodesViewModel(state);
   const channelsModel = createChannelsViewModel(state);
+  const paymentsModel = createPaymentsViewModel(state);
   const routingModel = createRoutingViewModel(state);
   const activityModel = createActivityViewModel(state);
+  const logsModel = createLogsViewModel(state);
+  const reportsModel = createReportsViewModel(state);
 
   switch (state.ui.inspector.entityType) {
     case "node":
       return nodesModel.inspector;
     case "channel":
       return channelsModel.inspector;
+    case "payment":
+      return paymentsModel.inspector;
     case "route":
       return routingModel.inspector;
     case "activity":
       return activityModel.inspector;
+    case "log":
+      return logsModel.inspector;
+    case "report":
+      return reportsModel.inspector;
     default:
       return null;
   }
@@ -1629,6 +2092,93 @@ function restoreFocus() {
   if (element && typeof element.focus === "function") {
     globalThis.queueMicrotask(() => element.focus());
   }
+}
+
+function exportReport(kind) {
+  const safeKind = kind || "json";
+  if (safeKind === "markdown") {
+    copyToClipboard(buildMarkdownReport(), "Markdown report");
+    return;
+  }
+  if (safeKind === "timeline") {
+    copyToClipboard(buildTimelineReport(), "Activity timeline");
+    return;
+  }
+  copyToClipboard(buildJsonReport(), "JSON report");
+}
+
+function buildJsonReport() {
+  return JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      workspace: state.activeWorkspace,
+      environment:
+        state.environment || state.bootstrap?.environmentFacts || null,
+      diagnosis: state.lastDiagnosisResult || null,
+      routePreview: state.lastExecutionPlan || null,
+      nodes: state.nodesSnapshot || null,
+      activity: state.activitySnapshot?.items || [],
+      notifications: getVisibleNotifications()
+    },
+    null,
+    2
+  );
+}
+
+function buildMarkdownReport() {
+  const diagnosis = state.lastDiagnosisResult;
+  const lines = [
+    "# Fiber Desktop Report",
+    "",
+    `Generated: ${new Date().toLocaleString()}`,
+    `Workspace: ${getWorkspaceMeta(state.activeWorkspace).label}`,
+    `Environment: ${state.environment?.name || state.bootstrap?.environmentFacts?.name || "Unknown"}`,
+    ""
+  ];
+
+  if (diagnosis) {
+    lines.push("## Current Investigation", "");
+    lines.push(`- Headline: ${diagnosis.diagnosis?.headline || "Unknown"}`);
+    lines.push(
+      `- Readiness: ${diagnosis.summary?.paymentReadiness || "Unknown"}`
+    );
+    lines.push(`- Route proof: ${diagnosis.summary?.routeProof || "Unknown"}`);
+    lines.push(
+      `- Blocking reason: ${diagnosis.routePreview?.blockingReason || "None recorded"}`
+    );
+    lines.push("");
+  }
+
+  lines.push("## Recent Activity", "");
+  for (const item of (state.activitySnapshot?.items || []).slice(0, 5)) {
+    lines.push(
+      `- ${item.timestampLabel || formatTimestamp(item.timestamp)}: ${item.title} (${humanize(
+        item.category || item.type || "event"
+      )})`
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function buildTimelineReport() {
+  const items = (state.activitySnapshot?.items || []).slice(0, 10);
+  return items
+    .map(
+      (item) =>
+        `${item.timestampLabel || formatTimestamp(item.timestamp)} | ${item.title} | ${item.message || ""}`
+    )
+    .join("\n");
+}
+
+function getWorkspaceMeta(workspace) {
+  return (
+    WORKSPACE_META[workspace] || {
+      label: humanize(workspace),
+      section: "Workspace",
+      description: `${humanize(workspace)} workspace`
+    }
+  );
 }
 
 function compactObject(source) {

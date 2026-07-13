@@ -8,6 +8,10 @@ export function getDom(state) {
     inspectorContent: document.querySelector("#inspector-content"),
     navButtons: Array.from(document.querySelectorAll("[data-nav-workspace]")),
     modeButtons: Array.from(document.querySelectorAll("[data-mode-button]")),
+    themeButtons: Array.from(document.querySelectorAll("[data-theme-button]")),
+    workspaceLabel: document.querySelector("#workspace-label"),
+    workspaceDescription: document.querySelector("#workspace-description"),
+    topbarContext: document.querySelector("#topbar-context"),
     statusSummary: document.querySelector("#status-summary"),
     statusEnvironment: document.querySelector("#status-environment"),
     statusConnection: document.querySelector("#status-connection"),
@@ -22,6 +26,10 @@ export function getDom(state) {
     commandQuery: document.querySelector("#command-query"),
     commandResults: document.querySelector("#command-results"),
     inspectorCloseButton: document.querySelector("#inspector-close"),
-    inspectorToggleButton: document.querySelector("#inspector-toggle-mode")
+    inspectorToggleButton: document.querySelector("#inspector-toggle-mode"),
+    dockPanel: document.querySelector("#dock-panel"),
+    dockTabButtons: Array.from(document.querySelectorAll("[data-dock-tab]")),
+    dockPanelContent: document.querySelector("#dock-panel-content"),
+    dockToggleButton: document.querySelector("#dock-toggle")
   };
 }

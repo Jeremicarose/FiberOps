@@ -49,4 +49,3 @@ function buildEventId(source, category, scenarioId, endpoint, timestamp) {
     [source, category, scenarioId || endpoint || "global", timestamp].join(":")
   );
 }
-
