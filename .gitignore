@@ -5,3 +5,6 @@ npm-debug.log*
 runtime/
 vendor/
 fnn_*.tar.gz
+playwright-report/
+test-results/
+*.tmp

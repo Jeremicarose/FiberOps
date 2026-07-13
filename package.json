@@ -7,9 +7,42 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test": "node --test"
+    "diagnose": "node src/cli.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "npm pack --dry-run",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lab:prepare": "node scripts/prepare-local-lab.mjs",
+    "lab:check": "node scripts/check-local-lab.mjs",
+    "lab:reset": "node scripts/reset-local-lab.mjs",
+    "test:node": "node --test",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:diagnostics": "node --test tests/diagnostics.test.js",
+    "test:contracts": "node --test tests/api-diagnose.integration.test.js",
+    "test:all": "npm run test:diagnostics && npm run test:contracts && npm run test:browser",
+    "check": "npm run format:check && npm run typecheck && npm run test:all",
+    "test": "npm run test:all",
+    "test:live": "FIBEROPS_LIVE_TESTS=1 node --test tests/live-integration.test.js"
+  },
+  "bin": {
+    "fiberops-diagnose": "./src/cli.js"
+  },
+  "exports": {
+    ".": "./src/lib/diagnostics.js",
+    "./diagnostics": "./src/lib/diagnostics.js",
+    "./diagnostics/contracts": "./src/lib/diagnostics/contracts.js",
+    "./diagnostics/adapters": "./src/lib/diagnostics/adapters.js",
+    "./server": "./src/lib/server-app.js"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.1",
+    "eslint": "^10.7.0",
+    "prettier": "^3.9.5",
+    "typescript": "^7.0.2"
   }
 }

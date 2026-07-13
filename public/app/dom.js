@@ -1,0 +1,30 @@
+export function getDom() {
+  return {
+    form: document.querySelector("#diagnostics-form"),
+    scenarioSelect: document.querySelector("#scenarioId"),
+    scenarioDescription: document.querySelector("#scenario-description"),
+    modeButtons: document.querySelectorAll("[data-mode-button]"),
+    visibilityFields: document.querySelectorAll("[data-visibility]"),
+    workspaceTabs: document.querySelectorAll("[data-workspace-tab]"),
+    workspacePanels: document.querySelectorAll("[data-workspace-panel]"),
+    resultEmpty: document.querySelector("#result-empty"),
+    resultContent: document.querySelector("#result-content"),
+    resultStatus: document.querySelector("#result-status"),
+    submitButton: document.querySelector("#submit-button"),
+    livePresetsContainer: document.querySelector("#live-presets"),
+    livePresetsGroup: document.querySelector("[data-live-presets-group]"),
+    liveStoryContainer: document.querySelector("#live-story"),
+    labFactsContainer: document.querySelector("#lab-facts"),
+    activeContext: document.querySelector("#active-context"),
+    alertsPanel: document.querySelector("#alerts-panel"),
+    routePreviewContainer: document.querySelector("#route-preview"),
+    incidentTimeline: document.querySelector("#incident-timeline"),
+    primaryAction: document.querySelector("#primary-action"),
+    multiNodePanel: document.querySelector("#multi-node-panel"),
+    nodesGrid: document.querySelector("#nodes-grid"),
+    comparisonPanel: document.querySelector("#comparison-panel"),
+    historyPanel: document.querySelector("#history-panel"),
+    bootstrapBadge: document.querySelector("#bootstrap-badge"),
+    bootstrapMessage: document.querySelector("#bootstrap-message")
+  };
+}
