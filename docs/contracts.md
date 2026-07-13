@@ -1,5 +1,12 @@
 # Contracts
 
+## Related docs
+
+- [Developer guide](./developer-guide.md)
+- [Architecture](./architecture.md)
+- [Runtime model](./runtime-model.md)
+- [End-to-end validation](./e2e-validation.md)
+
 FiberOps exposes a schema-driven diagnostics contract and publishes it over HTTP.
 
 ## Endpoints
@@ -10,6 +17,8 @@ FiberOps exposes a schema-driven diagnostics contract and publishes it over HTTP
 - `GET /api/contracts/diagnose/rules`
 
 These endpoints are wired in `src/lib/server-app.js` and sourced from `src/lib/diagnostics/contracts.js`.
+
+Bootstrap discovery at `GET /api/bootstrap` mirrors the same contract metadata so consumers can discover versions and capabilities before their first diagnose request.
 
 ## Request contract
 
@@ -24,6 +33,7 @@ These endpoints are wired in `src/lib/server-app.js` and sourced from `src/lib/d
 - `endpoint`
 - `token`
 - `timeoutMs`
+- `analysisDepth`
 - `outputMode`
 
 Validation is strict for unknown top-level request fields and supported enum values.
@@ -41,6 +51,16 @@ The canonical result includes:
 - `event`
 - `analyzedAt`
 
+The `contract` block now carries additive metadata beyond the canonical version string:
+
+- `version`
+- `schemaSet.name`
+- `schemaSet.version`
+- `compatibility.current`
+- `compatibility.backwardCompatibleWith`
+- `capabilities.features`
+- `outputModes`
+
 ## Additive compatibility
 
 The result schema intentionally leaves many nested sections permissive with `additionalProperties: true`.
@@ -53,6 +73,12 @@ This is deliberate:
 
 Consumers should treat the required top-level fields as stable and nested sections as additive.
 
+The same compatibility metadata is returned consistently from:
+
+- the contract bundle endpoint
+- bootstrap contract discovery
+- the canonical result `contract` block
+
 ## Output/export modes
 
 Supported `outputMode` values:
@@ -64,6 +90,25 @@ Supported `outputMode` values:
 - `wallet`
 
 `full` returns the canonical diagnosis result. The other modes are adapter views produced from that canonical result.
+
+Supported `analysisDepth` values:
+
+- `standard`
+- `deep`
+
+`standard` preserves the fast, compatible live path. `deep` opt-ins to `graph_channels` and `build_router` analysis.
+
+## Execution metadata
+
+Live results now add execution metadata without breaking the canonical top-level contract:
+
+- `selectedNodeId`
+- `aggregateStatus`
+- `execution.scope`
+- `execution.analysisDepth`
+- `execution.nodes[]`
+
+This metadata reflects the resolved node set that was actually validated and contacted, not just the raw request payload.
 
 ## Error envelope
 
@@ -78,7 +123,8 @@ All API errors use the same shape:
     "details": {}
   },
   "meta": {
-    "route": "/api/diagnose"
+    "route": "/api/diagnose",
+    "requestId": "req-..."
   }
 }
 ```

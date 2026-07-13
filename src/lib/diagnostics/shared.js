@@ -357,19 +357,66 @@ export function trimOrEmpty(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export function buildStableId(value) {
+  let hash = 0;
+  for (const character of String(value)) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  return `evt_${hash.toString(16).padStart(8, "0")}`;
+}
+
 export function pickDefined(source) {
   return Object.fromEntries(
-    Object.entries(source).filter(([, value]) => value)
+    Object.entries(source).filter(([, value]) => value !== undefined)
   );
 }
 
 export function deriveRouteProbeInput(request, parsedInvoice) {
-  const amount = resolveRequestedAmount(request, parsedInvoice);
-  const targetPubkey = resolveTargetPubkey(request, parsedInvoice);
+  const plan = deriveRouteProbePlan(request, parsedInvoice);
 
   return {
+    targetPubkey: plan.targetPubkey,
+    amount: plan.amount
+  };
+}
+
+export function deriveRouteProbePlan(request, parsedInvoice) {
+  const amount = resolveRequestedAmount(request, parsedInvoice);
+  const targetPubkey = resolveTargetPubkey(request, parsedInvoice);
+  const invoice = trimOrEmpty(request.invoice);
+
+  if (invoice) {
+    return {
+      strategy: "invoice",
+      evidenceMode: "invoice_dry_run",
+      targetPubkey,
+      amount: amount !== null ? toRpcHex(amount) : null,
+      request: {
+        invoice
+      }
+    };
+  }
+
+  if (targetPubkey && amount !== null) {
+    return {
+      strategy: "keysend",
+      evidenceMode: "keysend_dry_run",
+      targetPubkey,
+      amount: toRpcHex(amount),
+      request: {
+        targetPubkey,
+        amount: toRpcHex(amount),
+        keysend: true
+      }
+    };
+  }
+
+  return {
+    strategy: "insufficient_input",
+    evidenceMode: "insufficient_input",
     targetPubkey,
-    amount: amount !== null ? toRpcHex(amount) : null
+    amount: amount !== null ? toRpcHex(amount) : null,
+    request: null
   };
 }
 
@@ -445,13 +492,13 @@ export function normalizeRouteBuild(
     supported,
     status,
     requestedAmount: routeBuild.requestedAmount ?? base.requestedAmount,
-    targetPubkey: routeBuild.targetPubkey || base.targetPubkey,
+    targetPubkey: routeBuild.targetPubkey ?? base.targetPubkey,
     source: routeBuild.source || base.source,
     blockingError,
     candidates,
-    chosenCandidateId: chosenCandidate?.id || null,
+    chosenCandidateId: chosenCandidate?.id ?? null,
     reasoning:
-      routeBuild.reasoning ||
+      routeBuild.reasoning ??
       buildRouteBuildReasoning(chosenCandidate, candidates)
   };
 }
@@ -461,7 +508,8 @@ export function normalizeRouteProbe(
   request = {},
   parsedInvoice = null
 ) {
-  const requestedAmount = deriveRouteProbeInput(request, parsedInvoice).amount;
+  const probePlan = deriveRouteProbePlan(request, parsedInvoice);
+  const requestedAmount = probePlan.amount;
   const base = {
     attempted: false,
     supported: false,
@@ -472,7 +520,8 @@ export function normalizeRouteProbe(
     feeEstimate: null,
     requestedAmount,
     source: PROBE_METHOD_LABEL,
-    paymentHash: null
+    paymentHash: null,
+    evidenceMode: probePlan.evidenceMode
   };
 
   if (!routeProbe || typeof routeProbe !== "object") {
@@ -493,7 +542,8 @@ export function normalizeRouteProbe(
       blockingError: routeProbe.blockingError || null,
       feeEstimate: routeProbe.feeEstimate || null,
       paymentHash: routeProbe.paymentHash || null,
-      source: routeProbe.source || base.source
+      source: routeProbe.source || base.source,
+      evidenceMode: routeProbe.evidenceMode || base.evidenceMode
     };
   }
 
@@ -528,7 +578,12 @@ export function normalizeRouteProbe(
       routeProbe.method === "send_payment" || routeProbe.dryRun
         ? PROBE_METHOD_LABEL
         : routeProbe.source || base.source,
-    paymentHash
+    paymentHash,
+    evidenceMode:
+      routeProbe.evidenceMode ||
+      (pickFirst(routeProbe, ["request.invoice"]) ? "invoice_dry_run" : null) ||
+      (pickFirst(routeProbe, ["request.keysend"]) ? "keysend_dry_run" : null) ||
+      base.evidenceMode
   };
 }
 
@@ -668,19 +723,19 @@ function normalizeRouteBuildCandidate(
     id: candidate?.id || `candidate-${index + 1}`,
     source: candidate?.source || defaultSource,
     status,
-    blockingError: error?.message || candidate?.blockingError || null,
+    blockingError: error?.message ?? candidate?.blockingError ?? null,
     pathPubkeys,
     hopCount: routerHops.length || pathPubkeys.length,
     totalAmount:
       totalAmount !== null
         ? formatAmount(totalAmount)
-        : requestedAmount || null,
+        : requestedAmount ?? null,
     totalAmountValue: totalAmount !== null ? totalAmount.toString() : null,
     totalFee: totalFee !== null ? formatAmount(totalFee) : null,
     totalFeeValue: totalFee !== null ? totalFee.toString() : null,
     totalExpiry:
-      routerHops[0]?.incomingTlcExpiry ||
-      pickFirst(result, ["incoming_tlc_expiry", "total_time_lock"]) ||
+      routerHops[0]?.incomingTlcExpiry ??
+      pickFirst(result, ["incoming_tlc_expiry", "total_time_lock"]) ??
       null,
     routerHops,
     rawResult: result

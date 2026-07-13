@@ -92,6 +92,7 @@ export function buildRoutePreview({ request, context, diagnosis, summary }) {
   let status = "unknown";
   let blockingReason = null;
   let mode = "heuristic";
+  let evidenceMode = "heuristic";
   let confidence = "medium";
   let evidenceSource = "channel snapshot";
   let feeHint = deriveFeeHint({
@@ -105,6 +106,7 @@ export function buildRoutePreview({ request, context, diagnosis, summary }) {
   if (routeProbe.supported && routeProbe.status !== "skipped") {
     mode =
       routeProbe.routeFound || routeProbe.blockingError ? "dry_run" : "partial";
+    evidenceMode = routeProbe.evidenceMode || "dry_run";
     evidenceSource = routeProbe.source || PROBE_METHOD_LABEL;
     confidence = routeProbe.routeFound
       ? "high"
@@ -213,6 +215,7 @@ export function buildRoutePreview({ request, context, diagnosis, summary }) {
     (!routeProbe.supported || routeProbe.status === "skipped")
   ) {
     mode = "route_build";
+    evidenceMode = "build_router";
     status = "ready";
     confidence = "medium";
     evidenceSource = routeBuild.source || ROUTE_BUILD_METHOD_LABEL;
@@ -226,6 +229,7 @@ export function buildRoutePreview({ request, context, diagnosis, summary }) {
     (!routeProbe.supported || routeProbe.status === "skipped")
   ) {
     mode = "route_build";
+    evidenceMode = "build_router";
     status = "blocked";
     confidence = "medium";
     evidenceSource = routeBuild.source || ROUTE_BUILD_METHOD_LABEL;
@@ -281,10 +285,12 @@ export function buildRoutePreview({ request, context, diagnosis, summary }) {
 
   if (mode === "heuristic") {
     evidenceSource = "heuristic inference";
+    evidenceMode = "heuristic";
   }
 
   return {
     mode,
+    evidenceMode,
     status,
     confidence,
     evidenceSource,

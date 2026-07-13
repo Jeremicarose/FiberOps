@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose a new operator workflow, diagnostic, or documentation improvement.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Explain the operator or maintainer problem first.
+      placeholder: Judges cannot tell whether a route preview is based on real evidence or a heuristic.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the behavior or workflow you want.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints or risks
+      description: Note contract-compatibility, runtime, UI, or operational constraints that matter.
+  - type: textarea
+    id: success
+    attributes:
+      label: What success looks like
+      description: Define the testable outcome.

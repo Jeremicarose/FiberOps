@@ -1,4 +1,4 @@
-import { compact, slugify } from "./shared.js";
+import { buildStableId, compact, slugify } from "./shared.js";
 
 export function buildEventEnvelope({
   source,
@@ -50,10 +50,3 @@ function buildEventId(source, category, scenarioId, endpoint, timestamp) {
   );
 }
 
-function buildStableId(value) {
-  let hash = 0;
-  for (const character of String(value)) {
-    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  }
-  return `evt_${hash.toString(16).padStart(8, "0")}`;
-}

@@ -1,5 +1,23 @@
 const DEFAULT_MAX_JSON_BODY_BYTES = 64 * 1024;
 
+function parseBooleanValue(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+    if (["0", "false", "no", "off"].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return undefined;
+}
+
 export const REQUEST_POLICY_ERROR_CODES = {
   INVALID_CONTENT_TYPE: "INVALID_CONTENT_TYPE",
   REQUEST_TOO_LARGE: "REQUEST_TOO_LARGE",
@@ -23,11 +41,11 @@ export function createRequestPolicy(overrides = {}) {
       Number(overrides.maxJsonBodyBytes) > 0
         ? Number(overrides.maxJsonBodyBytes)
         : DEFAULT_MAX_JSON_BODY_BYTES,
-    allowExternalLiveEndpoints: Boolean(overrides.allowExternalLiveEndpoints),
-    allowInsecureTokenForwarding: Boolean(
-      overrides.allowInsecureTokenForwarding
-    ),
-    routeProbeEnabled: overrides.routeProbeEnabled !== false
+    allowExternalLiveEndpoints:
+      parseBooleanValue(overrides.allowExternalLiveEndpoints) ?? false,
+    allowInsecureTokenForwarding:
+      parseBooleanValue(overrides.allowInsecureTokenForwarding) ?? false,
+    routeProbeEnabled: parseBooleanValue(overrides.routeProbeEnabled) ?? true
   };
 }
 
@@ -172,9 +190,18 @@ export function createRequestAbortSignal(request) {
 }
 
 export function normalizeEndpoint(endpoint) {
-  return typeof endpoint === "string" && endpoint.trim()
-    ? endpoint.trim()
-    : null;
+  if (typeof endpoint !== "string" || !endpoint.trim()) {
+    return null;
+  }
+
+  const trimmed = endpoint.trim();
+  try {
+    const url = new URL(trimmed);
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.toString().replace(/\/$/, url.pathname === "/" ? "/" : "");
+  } catch {
+    return trimmed;
+  }
 }
 
 export function isLoopbackAddress(hostname) {

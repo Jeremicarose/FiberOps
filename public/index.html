@@ -3,399 +3,226 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FiberOps | Fiber on CKB Operator Console</title>
+    <title>FiberOps | Infrastructure Desktop</title>
     <meta
       name="description"
-      content="Read-only Fiber on CKB operator console for diagnosing failed payments and preflighting route readiness with a guided local proof flow."
+      content="Workspace-based Fiber infrastructure desktop for diagnostics, routing, node inspection, activity review, and configuration."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Cormorant+Garamond:wght@500;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="shell">
-      <header class="hero">
-        <div class="hero__copy">
-          <div class="hero__eyebrow-row">
-            <p class="eyebrow">Fiber on CKB operator console</p>
-            <span
-              id="bootstrap-badge"
-              class="hero-chip"
-              data-bootstrap-state="loading"
-              >Bootstrapping</span
-            >
-          </div>
+    <div class="app-shell">
+      <aside class="sidebar-shell">
+        <div class="brand-block">
+          <p class="brand-kicker">Fiber desktop</p>
           <h1>FiberOps</h1>
-          <p class="hero-copy">
-            Diagnose failed Fiber payments and check route readiness with a
-            read-only local proof flow.
-          </p>
-          <div
-            id="bootstrap-message"
-            class="bootstrap-banner"
+          <span
+            id="bootstrap-badge"
+            class="status-chip"
             data-bootstrap-state="loading"
-            role="status"
-            aria-live="polite"
+            >Bootstrapping</span
           >
-            Loading dashboard configuration and local lab metadata.
-          </div>
-          <div class="trust-badges" aria-label="Read-only trust guarantees">
-            <div class="trust-badge">
-              <span>Trust</span>
-              <strong>Read-only JSON-RPC</strong>
-            </div>
-            <div class="trust-badge">
-              <span>Safety</span>
-              <strong>No real payment sending</strong>
-            </div>
-            <div class="trust-badge">
-              <span>Scope</span>
-              <strong>Fiber-specific signals</strong>
-            </div>
-          </div>
         </div>
 
-        <aside class="hero-proof">
-          <div class="hero-proof__card">
-            <span class="hero-proof__label">Focus</span>
-            <strong>Failed payment diagnosis and route preflight.</strong>
-          </div>
-          <div class="proof-strip" aria-label="Proof points">
-            <article class="proof-strip__item">
-              <span>Read-only</span>
-              <strong>Real local Fiber lab</strong>
-            </article>
-          </div>
-        </aside>
-      </header>
-
-      <div class="workspace panel">
-        <div class="workspace__head">
-          <div>
-            <p class="eyebrow">Workspace</p>
-            <h2>Run FiberOps</h2>
-          </div>
-          <div class="mode-toggle" role="tablist" aria-label="Mode selector">
-            <button
-              type="button"
-              class="mode-toggle__button is-active"
-              data-mode-button="demo"
-            >
-              Demo
-            </button>
-            <button
-              type="button"
-              class="mode-toggle__button"
-              data-mode-button="live"
-            >
-              Live node
-            </button>
-          </div>
-        </div>
-
-        <div class="workspace-tabs" role="tablist" aria-label="Workspace tabs">
+        <nav class="workspace-nav" aria-label="Primary workspaces">
           <button
             type="button"
-            class="workspace-tab is-active"
-            data-workspace-tab="guided"
+            class="workspace-nav__item is-active"
+            data-nav-workspace="overview"
           >
-            Guided
+            Overview
           </button>
           <button
             type="button"
-            class="workspace-tab"
-            data-workspace-tab="manual"
+            class="workspace-nav__item"
+            data-nav-workspace="nodes"
           >
-            Manual
-          </button>
-          <button type="button" class="workspace-tab" data-workspace-tab="lab">
-            Lab
+            Nodes
           </button>
           <button
             type="button"
-            class="workspace-tab"
-            data-workspace-tab="results"
+            class="workspace-nav__item"
+            data-nav-workspace="channels"
           >
-            Results
+            Channels
           </button>
-        </div>
-
-        <form id="diagnostics-form" class="form-stack">
-          <input type="hidden" name="mode" value="demo" />
-
-          <section
-            class="workspace-panel is-active"
-            data-workspace-panel="guided"
+          <button
+            type="button"
+            class="workspace-nav__item"
+            data-nav-workspace="routing"
           >
-            <div class="panel-section runway-panel">
-              <div class="section-head">
-                <div>
-                  <p class="section-kicker">Guided proof flow</p>
-                  <h3>Start here</h3>
-                  <p class="section-copy">
-                    Preflight, real failure, known-good success.
-                  </p>
-                </div>
-              </div>
-              <div id="live-story" class="story-grid"></div>
-            </div>
+            Routing
+          </button>
+          <button
+            type="button"
+            class="workspace-nav__item"
+            data-nav-workspace="diagnostics"
+          >
+            Diagnostics
+          </button>
+          <button
+            type="button"
+            class="workspace-nav__item"
+            data-nav-workspace="activity"
+          >
+            Activity
+          </button>
+          <button
+            type="button"
+            class="workspace-nav__item"
+            data-nav-workspace="testing"
+          >
+            Testing
+          </button>
+          <button
+            type="button"
+            class="workspace-nav__item"
+            data-nav-workspace="configuration"
+          >
+            Configuration
+          </button>
+        </nav>
 
-            <div class="panel-section">
-              <div class="section-head">
-                <div>
-                  <p class="section-kicker">Scenario</p>
-                  <h3>Demo scenario</h3>
-                </div>
-              </div>
-              <div class="field-group" data-visibility="demo">
-                <label for="scenarioId">Pick a scenario</label>
-                <select id="scenarioId" name="scenarioId"></select>
-                <p id="scenario-description" class="field-help"></p>
-              </div>
+        <div class="sidebar-footer">
+          <p
+            id="bootstrap-message"
+            class="sidebar-note"
+            data-bootstrap-state="loading"
+          >
+            Loading bootstrap payload and runtime context.
+          </p>
+        </div>
+      </aside>
 
-              <div
-                class="field-group"
-                data-visibility="live"
-                data-live-presets-group
-                hidden
+      <div class="main-shell">
+        <header class="topbar-shell">
+          <button
+            type="button"
+            class="command-button"
+            id="command-palette-button"
+            aria-haspopup="dialog"
+            aria-controls="command-palette"
+          >
+            <span class="command-button__label">Search everywhere</span>
+            <span class="command-button__hint">Workspaces, nodes, history, actions</span>
+            <span class="command-button__shortcut">⌘K</span>
+          </button>
+          <div class="topbar-actions">
+            <div class="mode-toggle" aria-label="Mode selector">
+              <button
+                type="button"
+                class="mode-toggle__button is-active"
+                data-mode-button="demo"
               >
-                <label>Live shortcuts</label>
-                <div id="live-presets" class="preset-grid"></div>
-              </div>
+                Demo
+              </button>
+              <button
+                type="button"
+                class="mode-toggle__button"
+                data-mode-button="live"
+              >
+                Live
+              </button>
             </div>
-          </section>
-
-          <section class="workspace-panel" data-workspace-panel="manual">
-            <div class="panel-section">
-              <div class="section-head">
-                <div>
-                  <p class="section-kicker">Manual</p>
-                  <h3>Manual inspection</h3>
-                  <p class="section-copy">
-                    Enter your own RPC endpoint or payment details.
-                  </p>
-                </div>
-              </div>
-
-              <div class="field-group" data-visibility="live" hidden>
-                <label for="endpoint">Fiber RPC endpoint</label>
-                <input
-                  id="endpoint"
-                  name="endpoint"
-                  type="url"
-                  placeholder="http://127.0.0.1:8227"
-                />
-                <p class="field-help">Read-only Fiber JSON-RPC.</p>
-              </div>
-
-              <div class="field-group" data-visibility="live" hidden>
-                <label for="token">Biscuit bearer token</label>
-                <textarea
-                  id="token"
-                  name="token"
-                  rows="3"
-                  placeholder="Optional Bearer token"
-                ></textarea>
-              </div>
-
-              <div class="field-group">
-                <label for="invoice">Invoice</label>
-                <textarea
-                  id="invoice"
-                  name="invoice"
-                  rows="4"
-                  placeholder="Paste a Fiber invoice"
-                ></textarea>
-              </div>
-
-              <div class="field-row">
-                <div class="field-group">
-                  <label for="paymentHash">Payment hash</label>
-                  <input
-                    id="paymentHash"
-                    name="paymentHash"
-                    type="text"
-                    placeholder="0x..."
-                  />
-                </div>
-                <div class="field-group">
-                  <label for="amount">Requested amount</label>
-                  <input
-                    id="amount"
-                    name="amount"
-                    type="text"
-                    placeholder="150000000"
-                  />
-                </div>
-              </div>
-
-              <div class="field-group">
-                <label for="targetPubkey">Target pubkey</label>
-                <input
-                  id="targetPubkey"
-                  name="targetPubkey"
-                  type="text"
-                  placeholder="0x02..."
-                />
-                <p class="field-help">
-                  Use a Fiber pubkey, not a legacy peer_id.
-                </p>
-              </div>
+            <div id="status-summary" class="status-summary">
+              Waiting for runtime status
             </div>
-          </section>
-
-          <section class="workspace-panel" data-workspace-panel="lab">
-            <div
-              class="panel-section"
-              data-visibility="live"
-              data-live-presets-group
-              hidden
-            >
-              <div class="section-head">
-                <div>
-                  <p class="section-kicker">Lab</p>
-                  <h3>Local proof data</h3>
-                  <p class="section-copy">
-                    Two nodes, one channel, one success, one failure.
-                  </p>
-                </div>
-              </div>
-              <div id="lab-facts" class="fact-grid"></div>
-            </div>
-            <div
-              class="panel-section panel-section--empty"
-              data-visibility="demo"
-            >
-              <p class="field-help">
-                Switch to Live node to view local lab facts.
-              </p>
-            </div>
-          </section>
-
-          <section class="workspace-panel" data-workspace-panel="results">
-            <div class="panel-head panel-head--results">
-              <div>
-                <p class="eyebrow">Results</p>
-                <h2>Diagnosis</h2>
-              </div>
-              <div id="result-status" class="pill">Waiting</div>
-            </div>
-
-            <div id="result-empty" class="empty-state">
-              Start with the guided flow or run a scenario.
-            </div>
-
-            <div id="result-content" hidden>
-              <div id="active-context" class="context-banner" hidden></div>
-
-              <div class="result-stack">
-                <div class="result-card diagnosis-hero">
-                  <div class="result-card__top">
-                    <div>
-                      <p class="result-category" id="result-category"></p>
-                      <h3 id="result-headline"></h3>
-                    </div>
-                    <div class="confidence">
-                      <span>Confidence</span>
-                      <strong id="result-confidence">0%</strong>
-                    </div>
-                  </div>
-                  <p id="result-explanation" class="result-explanation"></p>
-                </div>
-
-                <div id="summary-grid" class="metric-grid"></div>
-
-                <div id="alerts-panel" class="alerts-stack" hidden></div>
-
-                <div id="multi-node-panel" class="panel-section" hidden>
-                  <div class="section-head">
-                    <div>
-                      <p class="section-kicker">Multi-node</p>
-                      <h4>Node comparison</h4>
-                    </div>
-                  </div>
-                  <div id="nodes-grid" class="node-grid"></div>
-                </div>
-
-                <div class="result-two-up">
-                  <div class="panel-section">
-                    <div class="section-head">
-                      <div>
-                        <p class="section-kicker">Proof</p>
-                        <h4>Route preview</h4>
-                      </div>
-                    </div>
-                    <div id="route-preview"></div>
-                  </div>
-
-                  <div class="panel-section">
-                    <div class="section-head">
-                      <div>
-                        <p class="section-kicker">Action</p>
-                        <h4>Next action</h4>
-                      </div>
-                    </div>
-                    <div
-                      id="primary-action"
-                      class="primary-action"
-                      hidden
-                    ></div>
-                    <ul id="actions-list" class="action-list"></ul>
-                  </div>
-                </div>
-
-                <details class="detail-block result-detail" open>
-                  <summary>Checks and evidence</summary>
-                  <div class="result-two-up detail-block__body">
-                    <div>
-                      <ul id="checks-list" class="status-list"></ul>
-                    </div>
-                    <div>
-                      <ul id="evidence-list" class="evidence-list"></ul>
-                    </div>
-                  </div>
-                </details>
-
-                <details class="detail-block result-detail" open>
-                  <summary>Comparison and history</summary>
-                  <div class="detail-block__body history-stack">
-                    <div id="comparison-panel"></div>
-                    <div id="history-panel"></div>
-                  </div>
-                </details>
-
-                <details class="detail-block result-detail">
-                  <summary>Incident ledger</summary>
-                  <div id="incident-timeline" class="detail-block__body"></div>
-                </details>
-
-                <details class="detail-block result-detail">
-                  <summary>References</summary>
-                  <ul
-                    id="references-list"
-                    class="link-list detail-block__body"
-                  ></ul>
-                </details>
-              </div>
-            </div>
-          </section>
-
-          <div class="form-footer">
-            <button id="submit-button" type="submit" class="button-primary">
-              Run diagnosis
-            </button>
-            <p class="field-help">
-              Read-only. Dry-run probing may be used for route checks, but no
-              real payment is sent.
-            </p>
           </div>
-        </form>
+        </header>
+
+        <main class="workspace-canvas">
+          <section id="workspace-root" aria-live="polite"></section>
+          <aside id="inspector-drawer" class="inspector-drawer" hidden>
+            <div class="inspector-drawer__surface">
+              <div class="inspector-drawer__head">
+                <div>
+                  <p class="workspace-kicker">Inspector</p>
+                  <h3 id="inspector-title">Selected detail</h3>
+                </div>
+                <div class="inspector-drawer__actions">
+                  <button
+                    type="button"
+                    class="ghost-button"
+                    id="inspector-toggle-mode"
+                  >
+                    Float
+                  </button>
+                  <button
+                    type="button"
+                    class="ghost-button"
+                    id="inspector-close"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div id="inspector-content"></div>
+            </div>
+          </aside>
+          <section id="notification-tray" class="notification-tray" hidden>
+            <div class="notification-tray__surface">
+              <div class="notification-tray__head">
+                <div>
+                  <p class="workspace-kicker">Notifications</p>
+                  <h3>Recent activity and alerts</h3>
+                </div>
+              </div>
+              <div id="notification-tray-list" class="notification-tray__list"></div>
+            </div>
+          </section>
+          <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+        </main>
+
+        <footer class="statusbar-shell">
+          <div class="statusbar-group">
+            <span>Environment</span>
+            <strong id="status-environment">Loading</strong>
+          </div>
+          <div class="statusbar-group">
+            <span>Connection</span>
+            <strong id="status-connection">Unknown</strong>
+          </div>
+          <div class="statusbar-group">
+            <span>Sync</span>
+            <strong id="status-sync">Idle</strong>
+          </div>
+          <button
+            type="button"
+            class="statusbar-group statusbar-group--button"
+            id="notification-button"
+            aria-expanded="false"
+            aria-controls="notification-tray"
+          >
+            <span>Notifications</span>
+            <strong id="status-notifications">0</strong>
+          </button>
+        </footer>
       </div>
     </div>
+
+    <dialog id="command-palette" class="command-palette">
+      <form method="dialog" class="command-palette__surface">
+        <div class="command-palette__head">
+          <label for="command-query">Search everywhere</label>
+          <div class="command-palette__head-actions">
+            <span class="command-palette__hint">↑ ↓ move · ↵ open · esc close</span>
+            <button type="submit" class="ghost-button">Close</button>
+          </div>
+        </div>
+        <input
+          id="command-query"
+          type="search"
+          placeholder="Jump to diagnostics, open a node, copy an endpoint, rerun a route…"
+        />
+        <div id="command-results" class="command-results" role="listbox"></div>
+      </form>
+    </dialog>
 
     <script type="module" src="/app.js"></script>
   </body>

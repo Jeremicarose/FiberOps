@@ -1,0 +1,8 @@
+{
+  "mode": "live",
+  "endpoint": "http://127.0.0.1:8227",
+  "amount": "150000000",
+  "targetPubkey": "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea",
+  "analysisDepth": "standard",
+  "outputMode": "backend"
+}

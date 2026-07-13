@@ -4,12 +4,17 @@ import {
   listDemoScenarioMeta
 } from "../demo-scenarios.js";
 import { FiberRpcError } from "../fiber-rpc.js";
-import { HistoryStore } from "../history-store.js";
+import {
+  createHistoryBackend,
+  getHistoryBackendStatus
+} from "../history-backend.js";
 import { mapWithConcurrency } from "../server/concurrency.js";
 
 import {
+  DIAGNOSIS_CAPABILITIES,
   DIAGNOSIS_CONTRACT_VERSION,
   DIAGNOSIS_OUTPUT_MODES,
+  DIAGNOSIS_SCHEMA_SET,
   getContractBundle
 } from "./contracts.js";
 import {
@@ -26,6 +31,7 @@ import {
   analyzeLiveNode,
   buildNodeResult
 } from "./collectors.js";
+import { decorateNodeResult } from "./per-node.js";
 import {
   buildMultiNodeSummary,
   normalizeRouteProbe,
@@ -33,15 +39,15 @@ import {
   trimOrEmpty
 } from "./shared.js";
 
-export function getBootstrapData(
+export async function getBootstrapData(
   defaultEndpoint = "http://127.0.0.1:8227",
   options = {}
 ) {
   const nodeSet = Array.isArray(options.nodeSet) ? options.nodeSet : [];
   const requestPolicy = options.requestPolicy || {};
-  const persistenceConfigured = Boolean(
-    options.historyPath || options.historyStore
-  );
+  const historyBackend = resolveHistoryBackend(options);
+  const historyStatus = await getHistoryBackendStatus(historyBackend);
+  const observabilitySnapshot = options.observability?.snapshot?.() || null;
 
   return {
     defaultEndpoint,
@@ -50,9 +56,13 @@ export function getBootstrapData(
       multiNodeLive: true,
       routeProbe: true,
       routeBuilder: true,
-      persistence: persistenceConfigured,
+      persistence: historyStatus.configured,
       machineExports: true,
-      cli: true
+      cli: true,
+      observability: true,
+      historyBackendStatus: true,
+      contractCompatibilityMetadata: true,
+      deepRouteAnalysis: true
     },
     runtime: {
       policy: {
@@ -61,16 +71,28 @@ export function getBootstrapData(
         insecureTokenForwardingAllowed:
           requestPolicy.allowInsecureTokenForwarding ?? false,
         routeProbeEnabled: requestPolicy.routeProbeEnabled !== false,
-        maxJsonBodyBytes: requestPolicy.maxJsonBodyBytes || null
+        maxJsonBodyBytes: requestPolicy.maxJsonBodyBytes || null,
+        analysisDepths: ["standard", "deep"]
       },
-      persistence: {
-        configured: persistenceConfigured,
-        enabled: persistenceConfigured,
-        degraded: false
+      persistence: historyStatus,
+      observability: {
+        enabled: Boolean(options.observability?.enabled),
+        requestCountersAvailable: Boolean(observabilitySnapshot),
+        runCountersAvailable: Boolean(observabilitySnapshot)
       }
     },
     contracts: {
       version: DIAGNOSIS_CONTRACT_VERSION,
+      schemaSet: {
+        ...DIAGNOSIS_SCHEMA_SET
+      },
+      compatibility: {
+        current: DIAGNOSIS_CONTRACT_VERSION,
+        backwardCompatibleWith: [...DIAGNOSIS_SCHEMA_SET.backwardCompatibleWith]
+      },
+      capabilities: {
+        ...DIAGNOSIS_CAPABILITIES
+      },
       outputModes: [...DIAGNOSIS_OUTPUT_MODES],
       schemaNames: ["request", "result", "exports", "rules"]
     },
@@ -86,13 +108,45 @@ export function getBootstrapData(
 
 export async function runDiagnosis(payload = {}, options = {}) {
   const mode = payload.mode === "live" ? "live" : "demo";
-  if (mode === "live") {
-    return analyzeLive(payload, options);
+  const runContext = options.runContext || {};
+  const observability =
+    runContext.observability || options.observability || null;
+  const runStartedAt = Date.now();
+
+  observability?.recordRunStart({
+    requestId: runContext.requestId || null,
+    source: mode,
+    mode
+  });
+
+  try {
+    const result =
+      mode === "live"
+        ? await analyzeLive(payload, options)
+        : await analyzeDemo(payload, options);
+
+    observability?.recordRunComplete({
+      requestId: runContext.requestId || null,
+      source: result.source,
+      category: result.diagnosis?.category || null,
+      status: "completed",
+      durationMs: Date.now() - runStartedAt
+    });
+
+    return result;
+  } catch (error) {
+    observability?.recordRunComplete({
+      requestId: runContext.requestId || null,
+      source: mode,
+      category: null,
+      status: "failed",
+      durationMs: Date.now() - runStartedAt
+    });
+    throw error;
   }
-  return analyzeDemo(payload, options);
 }
 
-async function analyzeDemo(payload) {
+async function analyzeDemo(payload, options = {}) {
   const scenario = getDemoScenario(payload.scenarioId) ?? demoScenarios[0];
   const request = {
     ...scenario.request,
@@ -108,11 +162,15 @@ async function analyzeDemo(payload) {
     source: "demo",
     request,
     context: scenario.context,
-    scenario
+    scenario,
+    runContext: options.runContext || {}
   });
 }
 
 async function analyzeLive(payload, options) {
+  const runContext = options.runContext || {};
+  const observability =
+    runContext.observability || options.observability || null;
   const request = {
     ...pickDefined({
       invoice: trimOrEmpty(payload.invoice),
@@ -123,18 +181,38 @@ async function analyzeLive(payload, options) {
   };
   const nodeSet = resolveNodeSet(payload, options);
   const concurrency = resolveLiveConcurrency(nodeSet, options);
+  observability?.recordLiveFanout({
+    requestId: runContext.requestId || null,
+    nodeCount: nodeSet.length,
+    concurrency
+  });
   const nodeSnapshots = await mapWithConcurrency(
     nodeSet,
     concurrency,
     async (nodeConfig) => analyzeLiveNode(request, payload, nodeConfig, options)
   );
   const nodes = nodeSet.map((nodeConfig, index) =>
-    buildNodeResult(nodeConfig, request, nodeSnapshots[index], summarizeContext)
+    decorateNodeResult({
+      source: "live",
+      request,
+      scenario: null,
+      node: buildNodeResult(
+        nodeConfig,
+        request,
+        nodeSnapshots[index],
+        summarizeContext
+      )
+    })
   );
 
   const aggregate = aggregateNodeResults(nodes, request, options);
 
   if (aggregate.context.error && nodes.every((node) => node.error)) {
+    observability?.recordAllNodesFailed({
+      requestId: runContext.requestId || null,
+      nodeCount: nodes.length,
+      errorCode: aggregate.context.error.code || "RPC_TRANSPORT_ERROR"
+    });
     throw new FiberRpcError(
       aggregate.context.error.message || "Fiber RPC request failed.",
       {
@@ -159,8 +237,10 @@ async function analyzeLive(payload, options) {
     },
     context: aggregate.context,
     nodes,
-    historyStore: resolveHistoryStore(options),
-    scenario: null
+    historyBackend: resolveHistoryBackend(options),
+    scenario: null,
+    runContext,
+    execution: buildExecutionSummary(nodes, aggregate, options)
   });
 }
 
@@ -170,7 +250,9 @@ async function finalizeResult({
   context,
   scenario = null,
   nodes = [],
-  historyStore = null
+  historyBackend = null,
+  runContext = {},
+  execution = null
 }) {
   const multiNodeSummary = buildMultiNodeSummary(nodes);
   const aggregateContext = {
@@ -208,10 +290,30 @@ async function finalizeResult({
     scenario,
     summary
   });
+  const observability = runContext.observability || null;
+
+  observability?.recordDiagnosisOutcome({
+    requestId: runContext.requestId || null,
+    source,
+    category: diagnosis.category,
+    severity: diagnosis.severity,
+    readiness: summary.paymentReadiness,
+    allNodesFailed: false
+  });
 
   const result = {
     contract: {
       version: DIAGNOSIS_CONTRACT_VERSION,
+      schemaSet: {
+        ...DIAGNOSIS_SCHEMA_SET
+      },
+      compatibility: {
+        current: DIAGNOSIS_CONTRACT_VERSION,
+        backwardCompatibleWith: [...DIAGNOSIS_SCHEMA_SET.backwardCompatibleWith]
+      },
+      capabilities: {
+        ...DIAGNOSIS_CAPABILITIES
+      },
       defaultOutputMode: "full",
       outputModes: [...DIAGNOSIS_OUTPUT_MODES]
     },
@@ -228,16 +330,23 @@ async function finalizeResult({
     routePreview,
     alerts,
     event,
-    analyzedAt: event.timestamp
+    analyzedAt: event.timestamp,
+    ...(execution
+      ? {
+          execution,
+          selectedNodeId: execution.selectedNodeId,
+          aggregateStatus: execution.aggregateStatus
+        }
+      : {})
   };
 
   if (nodes.length > 0) {
     result.nodes = nodes;
   }
 
-  if (historyStore && source === "live") {
+  if (historyBackend && source === "live") {
     const history = await buildHistoryInsights({
-      historyStore,
+      historyStore: historyBackend,
       event,
       request,
       summary,
@@ -249,6 +358,12 @@ async function finalizeResult({
     if (history) {
       result.history = history.public;
       augmentDiagnosisWithHistory(result.diagnosis, history);
+      observability?.recordHistoryPersistence({
+        requestId: runContext.requestId || null,
+        success: !history.public?.error,
+        backendType: historyBackend.type || "unknown",
+        errorCode: history.public?.error?.code || null
+      });
     }
   }
 
@@ -277,7 +392,11 @@ function resolveNodeSet(payload, options) {
           : trimOrEmpty(payload.token),
       timeoutMs: node.timeoutMs,
       probe: node.probe,
-      primary: node.primary ?? index === 0
+      primary: node.primary ?? index === 0,
+      requested: Boolean(node.requested),
+      selected: Boolean(node.selected),
+      tokenSource: node.tokenSource || (node.token ? "node_config" : "none"),
+      policyValidated: node.policyValidated === true
     }));
   }
 
@@ -292,7 +411,11 @@ function resolveNodeSet(payload, options) {
       token: trimOrEmpty(payload.token),
       timeoutMs: payload.timeoutMs,
       probe: true,
-      primary: true
+      primary: true,
+      requested: Boolean(payload.endpoint),
+      selected: true,
+      tokenSource: payload.token ? "request" : "none",
+      policyValidated: false
     }
   ];
 }
@@ -305,16 +428,64 @@ function resolveLiveConcurrency(nodeSet, options) {
   return Math.min(Math.max(nodeSet.length, 1), 4);
 }
 
-function resolveHistoryStore(options) {
-  if (options.historyStore) {
-    return options.historyStore;
-  }
-  if (options.historyPath) {
-    return new HistoryStore({ filePath: options.historyPath });
-  }
-  return null;
+function resolveHistoryBackend(options) {
+  return createHistoryBackend(options);
+}
+
+function buildExecutionSummary(nodes, aggregate, options) {
+  const executionPlan = options.executionPlan || null;
+
+  return {
+    scope:
+      executionPlan?.scope ||
+      (nodes.length > 1 ? "configured_node_set" : "single_node"),
+    selectedNodeId:
+      aggregate.selectedNode?.id ||
+      executionPlan?.selectedNodeId ||
+      nodes[0]?.id ||
+      null,
+    aggregateStatus:
+      aggregate.aggregateStatus || (nodes.length > 1 ? "mixed" : "single_node"),
+    analysisDepth: options.analysisDepth || "standard",
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      name: node.name,
+      endpoint: node.endpoint,
+      primary: Boolean(node.primary),
+      requested: Boolean(node.requested),
+      selected: Boolean(node.selected),
+      probeEnabled: node.probeEnabled !== false,
+      tokenSource: node.tokenSource || "none",
+      policyValidated: node.policyValidated === true,
+      diagnosis: node.diagnosis
+        ? {
+            category: node.diagnosis.category,
+            severity: node.diagnosis.severity,
+            headline: node.diagnosis.headline
+          }
+        : null,
+      summary: node.summary
+        ? {
+            paymentReadiness: node.summary.paymentReadiness,
+            targetVisibility: node.summary.targetVisibility,
+            estimatedOutbound: node.summary.estimatedOutbound
+          }
+        : null,
+      routeStatus: node.routePreview?.status || null,
+      routeEvidenceMode: node.routePreview?.evidenceMode || null,
+      error: node.error
+    }))
+  };
 }
 
 export function getDiagnosticsContract() {
   return getContractBundle();
+}
+
+export async function getRuntimeStatus(options = {}) {
+  const historyBackend = resolveHistoryBackend(options);
+  return {
+    history: await getHistoryBackendStatus(historyBackend),
+    observability: options.observability?.snapshot?.() || null
+  };
 }

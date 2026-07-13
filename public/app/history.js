@@ -39,11 +39,16 @@ export function readIncidentHistory() {
 }
 
 export function installHistorySync(onChange) {
-  window.addEventListener("storage", (event) => {
+  const listener = (event) => {
     if (event.key === HISTORY_KEY) {
       onChange();
     }
-  });
+  };
+
+  window.addEventListener("storage", listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+  };
 }
 
 function writeIncidentHistory(items) {

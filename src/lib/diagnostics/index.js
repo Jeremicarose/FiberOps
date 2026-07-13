@@ -6,6 +6,7 @@ export {
   toWalletExport
 } from "./adapters.js";
 export {
+  DIAGNOSIS_ANALYSIS_DEPTHS,
   DIAGNOSIS_CONTRACT_VERSION,
   DIAGNOSIS_OUTPUT_MODES,
   diagnosisExportSchemas,
@@ -29,6 +30,7 @@ export { getRuleCatalog } from "./rules.js";
 export {
   getBootstrapData,
   getDiagnosticsContract,
+  getRuntimeStatus,
   runDiagnosis
 } from "./runner.js";
-export { deriveRouteProbeInput } from "./shared.js";
+export { deriveRouteProbeInput, deriveRouteProbePlan } from "./shared.js";

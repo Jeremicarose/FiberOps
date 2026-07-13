@@ -1,20 +1,17 @@
 import { chmod, copyFile, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.join(__dirname, "..");
+import {
+  createLocalLabManifest,
+  getLocalLabPaths,
+  getLocalLabTopology
+} from "./local-lab-topology.mjs";
 
-const archivePath =
-  process.env.FIBEROPS_FNN_ARCHIVE ||
-  path.join(rootDir, "fnn_v0.9.0-rc5-x86_64-darwin-portable.tar.gz");
-const runtimeDir =
-  process.env.FIBEROPS_RUNTIME_DIR || path.join(rootDir, "runtime");
-const vendorDir =
-  process.env.FIBEROPS_VENDOR_DIR || path.join(rootDir, "vendor", "fnn");
+const rootDir = process.cwd();
+const { archivePath, runtimeDir, vendorDir, manifestPath } = getLocalLabPaths();
+const topology = getLocalLabTopology();
 const force =
   process.argv.includes("--force") || process.env.FIBEROPS_LAB_FORCE === "1";
 
@@ -26,63 +23,23 @@ if (!existsSync(archivePath)) {
 
 await mkdir(vendorDir, { recursive: true });
 await mkdir(runtimeDir, { recursive: true });
-await mkdir(path.join(runtimeDir, "node1"), { recursive: true });
-await mkdir(path.join(runtimeDir, "node2"), { recursive: true });
+for (const node of topology.nodes) {
+  await mkdir(node.runtimeDir, { recursive: true });
+}
 
 extractArchiveFile("fnn", vendorDir);
 extractArchiveFile("fnn-cli", vendorDir);
 
-await syncBinary(
-  path.join(vendorDir, "fnn"),
-  path.join(runtimeDir, "node1", "fnn")
-);
-await syncBinary(
-  path.join(vendorDir, "fnn-cli"),
-  path.join(runtimeDir, "node1", "fnn-cli")
-);
-await syncBinary(
-  path.join(vendorDir, "fnn"),
-  path.join(runtimeDir, "node2", "fnn")
-);
-await syncBinary(
-  path.join(vendorDir, "fnn-cli"),
-  path.join(runtimeDir, "node2", "fnn-cli")
-);
+for (const node of topology.nodes) {
+  await syncBinary(path.join(vendorDir, "fnn"), node.binaryPaths.fnn);
+  await syncBinary(path.join(vendorDir, "fnn-cli"), node.binaryPaths.cli);
+}
 
 const baseConfig = readArchiveText("config/testnet/config.yml");
-await writeConfigIfNeeded(
-  path.join(runtimeDir, "node1", "config.yml"),
-  baseConfig
-);
-await writeConfigIfNeeded(
-  path.join(runtimeDir, "node2", "config.yml"),
-  createNode2Config(baseConfig)
-);
+await writeConfigIfNeeded(topology.nodes[0].configPath, baseConfig);
+await writeConfigIfNeeded(topology.nodes[1].configPath, createNode2Config(baseConfig));
 
-await writeFile(
-  path.join(runtimeDir, "manifest.json"),
-  JSON.stringify(
-    {
-      generatedAt: new Date().toISOString(),
-      archivePath,
-      vendorDir,
-      nodes: [
-        {
-          name: "node1",
-          rpc: "http://127.0.0.1:8227",
-          p2p: "/ip4/0.0.0.0/tcp/8228"
-        },
-        {
-          name: "node2",
-          rpc: "http://127.0.0.1:8237",
-          p2p: "/ip4/0.0.0.0/tcp/8238"
-        }
-      ]
-    },
-    null,
-    2
-  )
-);
+await writeFile(manifestPath, JSON.stringify(createLocalLabManifest(), null, 2));
 
 process.stdout.write(
   `Prepared Fiber local lab in ${runtimeDir}. Run \"npm run lab:check\" to validate the generated state.\n`

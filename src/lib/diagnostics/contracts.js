@@ -6,6 +6,25 @@ export const DIAGNOSIS_OUTPUT_MODES = [
   "backend",
   "wallet"
 ];
+export const DIAGNOSIS_ANALYSIS_DEPTHS = ["standard", "deep"];
+
+export const DIAGNOSIS_SCHEMA_SET = {
+  name: "fiberops-diagnosis",
+  version: "2026-07-12",
+  backwardCompatibleWith: ["2026-07-12"]
+};
+
+export const DIAGNOSIS_CAPABILITIES = {
+  outputModes: [...DIAGNOSIS_OUTPUT_MODES],
+  features: [
+    "multi-node-live",
+    "route-probe",
+    "route-builder",
+    "history-persistence",
+    "machine-exports",
+    "observability-runtime"
+  ]
+};
 
 export const diagnosisRequestSchema = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -44,6 +63,10 @@ export const diagnosisRequestSchema = {
     timeoutMs: {
       type: "integer",
       minimum: 1
+    },
+    analysisDepth: {
+      type: "string",
+      enum: DIAGNOSIS_ANALYSIS_DEPTHS
     },
     outputMode: {
       type: "string",
@@ -177,6 +200,16 @@ export const ruleCatalogSchema = {
 export function getContractBundle() {
   return {
     version: DIAGNOSIS_CONTRACT_VERSION,
+    schemaSet: {
+      ...DIAGNOSIS_SCHEMA_SET
+    },
+    compatibility: {
+      current: DIAGNOSIS_CONTRACT_VERSION,
+      backwardCompatibleWith: [...DIAGNOSIS_SCHEMA_SET.backwardCompatibleWith]
+    },
+    capabilities: {
+      ...DIAGNOSIS_CAPABILITIES
+    },
     outputModes: [...DIAGNOSIS_OUTPUT_MODES],
     schemas: {
       request: diagnosisRequestSchema,
@@ -229,21 +262,70 @@ export function validateDiagnosisRequest(payload = {}) {
     errors.push('Field "timeoutMs" must be a positive integer.');
   }
 
+  const analysisDepth =
+    payload.analysisDepth === undefined || payload.analysisDepth === ""
+      ? undefined
+      : String(payload.analysisDepth).trim();
+  if (analysisDepth && !DIAGNOSIS_ANALYSIS_DEPTHS.includes(analysisDepth)) {
+    errors.push(
+      `Field "analysisDepth" must be one of: ${DIAGNOSIS_ANALYSIS_DEPTHS.join(", ")}.`
+    );
+  }
+
+  const normalizedMode = mode || "demo";
+  const normalizedEndpoint = normalizeOptionalString(payload.endpoint);
+  if (normalizedEndpoint && !isValidEndpointSyntax(normalizedEndpoint)) {
+    errors.push('Field "endpoint" must be a valid http or https URL.');
+  }
+
   const normalized = {
-    mode: mode || "demo",
+    mode: normalizedMode,
     scenarioId: normalizeOptionalString(payload.scenarioId),
     invoice: normalizeOptionalString(payload.invoice),
     paymentHash: normalizeOptionalString(payload.paymentHash),
     amount: normalizeOptionalString(payload.amount),
     targetPubkey: normalizeOptionalString(payload.targetPubkey),
-    endpoint: normalizeOptionalString(payload.endpoint),
+    endpoint: normalizedEndpoint,
     token: normalizeOptionalString(payload.token),
     timeoutMs: timeoutValue,
+    analysisDepth:
+      analysisDepth || (normalizedMode === "live" ? "deep" : "standard"),
     outputMode: outputMode || "full"
   };
 
-  if (normalized.mode === "live" && !normalized.endpoint) {
-    normalized.endpoint = undefined;
+  if (normalized.mode === "demo") {
+    if (!normalized.scenarioId) {
+      errors.push('Field "scenarioId" is required in demo mode.');
+    }
+  }
+
+  if (normalized.mode === "live") {
+    if (normalized.scenarioId) {
+      errors.push('Field "scenarioId" is only allowed in demo mode.');
+    }
+
+    const hasInvoice = normalized.invoice !== undefined;
+    const hasPaymentHash = normalized.paymentHash !== undefined;
+    const hasRouteProbeFields =
+      normalized.amount !== undefined || normalized.targetPubkey !== undefined;
+
+    if (hasInvoice && hasPaymentHash) {
+      errors.push('Fields "invoice" and "paymentHash" cannot be combined.');
+    }
+
+    if (hasInvoice && hasRouteProbeFields) {
+      errors.push(
+        'Field "invoice" cannot be combined with "amount" or "targetPubkey".'
+      );
+    }
+
+    if (normalized.amount && !normalized.targetPubkey) {
+      errors.push('Field "targetPubkey" is required when "amount" is provided.');
+    }
+
+    if (normalized.targetPubkey && !normalized.amount) {
+      errors.push('Field "amount" is required when "targetPubkey" is provided.');
+    }
   }
 
   return {
@@ -328,6 +410,15 @@ function normalizeOptionalString(value) {
   }
   const normalized = String(value).trim();
   return normalized === "" ? undefined : normalized;
+}
+
+function isValidEndpointSyntax(value) {
+  try {
+    const endpoint = new URL(value);
+    return endpoint.protocol === "http:" || endpoint.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function normalizeTimeout(value) {

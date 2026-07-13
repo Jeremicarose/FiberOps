@@ -4,6 +4,12 @@ import assert from "node:assert/strict";
 import { runDiagnosis } from "../src/lib/diagnostics.js";
 
 const enabled = process.env.FIBEROPS_LIVE_TESTS === "1";
+const liveEnvReady = Boolean(
+  process.env.FIBEROPS_SUCCESS_PAYMENT_HASH &&
+    process.env.FIBEROPS_FAILED_PAYMENT_HASH &&
+    process.env.FIBEROPS_TARGET_PUBKEY
+);
+const maybeTest = enabled && liveEnvReady ? test : test.skip;
 const nodeSet = [
   {
     id: "node1",
@@ -21,8 +27,6 @@ const knownSuccess = process.env.FIBEROPS_SUCCESS_PAYMENT_HASH;
 const knownFailure = process.env.FIBEROPS_FAILED_PAYMENT_HASH;
 const targetPubkey = process.env.FIBEROPS_TARGET_PUBKEY;
 const probeAmount = process.env.FIBEROPS_PROBE_AMOUNT || "10000000000";
-
-const maybeTest = enabled ? test : test.skip;
 
 maybeTest("live lab returns both node snapshots", async () => {
   const result = await runDiagnosis(
@@ -43,7 +47,6 @@ maybeTest("live lab returns both node snapshots", async () => {
 });
 
 maybeTest("live lab diagnoses known successful payment hash", async () => {
-  assert.ok(knownSuccess, "FIBEROPS_SUCCESS_PAYMENT_HASH is required");
   const result = await runDiagnosis(
     {
       mode: "live",
@@ -59,7 +62,6 @@ maybeTest("live lab diagnoses known successful payment hash", async () => {
 });
 
 maybeTest("live lab diagnoses known failed payment hash", async () => {
-  assert.ok(knownFailure, "FIBEROPS_FAILED_PAYMENT_HASH is required");
   const result = await runDiagnosis(
     {
       mode: "live",

@@ -87,62 +87,8 @@ export function buildDiagnosis({
     });
   }
 
-  if (multiNode.enabled) {
-    const routeEvidence = [];
-    if (multiNode.probeReadyNodes > 0)
-      routeEvidence.push(`${multiNode.probeReadyNodes} ready`);
-    if (multiNode.probeBlockedNodes > 0)
-      routeEvidence.push(`${multiNode.probeBlockedNodes} blocked`);
-    if (multiNode.probeSkippedNodes > 0)
-      routeEvidence.push(`${multiNode.probeSkippedNodes} skipped`);
-
-    checks.push({
-      status: multiNode.reachableNodes > 0 ? "pass" : "fail",
-      title: "Multi-node coverage",
-      detail: `${multiNode.reachableNodes}/${multiNode.nodeCount} node(s) responded${routeEvidence.length ? `; probes: ${routeEvidence.join(", ")}.` : "."}`
-    });
-
-    evidence.push({
-      label: "Nodes analyzed",
-      value: `${multiNode.nodeCount}`
-    });
-
-    if (multiNode.consistentProbeStatus === false) {
-      checks.push({
-        status: "warn",
-        title: "Cross-node consistency",
-        detail:
-          "Different nodes reported different route readiness for the same request, which usually means local liquidity or graph visibility differs by sender."
-      });
-    }
-  }
-
-  if (context.partialErrors?.channels) {
-    checks.push({
-      status: "warn",
-      title: "Channel read",
-      detail: `Could not read channels: ${context.partialErrors.channels.message}`
-    });
-  } else if (channels.length === 0) {
-    checks.push({
-      status: "fail",
-      title: "Open channels",
-      detail: "No channel data is available, so outbound liquidity may be zero."
-    });
-  } else {
-    checks.push({
-      status: openChannels.length > 0 ? "pass" : "warn",
-      title: "Open channels",
-      detail:
-        openChannels.length > 0
-          ? `${openChannels.length} open channel(s) detected.`
-          : "Channels were returned, but none look open or ready."
-    });
-    evidence.push({
-      label: "Open channels",
-      value: String(openChannels.length)
-    });
-  }
+  addMultiNodeFindings(checks, evidence, multiNode);
+  addChannelFindings(checks, evidence, context, channels, openChannels);
 
   if (requestedAmount !== null) {
     evidence.push({
@@ -237,109 +183,10 @@ export function buildDiagnosis({
     });
   }
 
-  if (routeProbe.supported) {
-    if (routeProbe.routeFound) {
-      checks.push({
-        status: "pass",
-        title: "Route probe",
-        detail:
-          "Fiber send_payment dry-run accepted this target and amount without sending a payment."
-      });
-      evidence.push({
-        label: "Route probe",
-        value: routeProbe.source || PROBE_METHOD_LABEL
-      });
-      evidence.push({
-        label: "Route proof",
-        value: "Confirmed by real Fiber dry run"
-      });
-      if (routeProbe.paymentHash)
-        evidence.push({
-          label: "Probe payment hash",
-          value: routeProbe.paymentHash
-        });
-      if (routeProbe.hops.length > 0)
-        evidence.push({
-          label: "Probe hops",
-          value: String(routeProbe.hops.length)
-        });
-    } else if (routeProbe.blockingError) {
-      checks.push({
-        status: "fail",
-        title: "Route probe",
-        detail: routeProbe.blockingError
-      });
-      evidence.push({
-        label: "Route probe",
-        value: routeProbe.source || PROBE_METHOD_LABEL
-      });
-    }
-  }
-
-  if (routeBuild.supported) {
-    const successfulCandidates = routeBuild.candidates.filter(
-      (candidate) => candidate.status === "ready"
-    );
-    if (successfulCandidates.length > 0) {
-      checks.push({
-        status: "pass",
-        title: "Route builder",
-        detail: `Fiber build_router constructed ${successfulCandidates.length} constrained route candidate(s) for this target and amount.`
-      });
-      evidence.push({
-        label: "Route builder",
-        value: routeBuild.source
-      });
-      evidence.push({
-        label: "Route candidates",
-        value: String(successfulCandidates.length)
-      });
-    } else if (routeBuild.blockingError) {
-      checks.push({
-        status: "warn",
-        title: "Route builder",
-        detail: routeBuild.blockingError
-      });
-      evidence.push({
-        label: "Route builder",
-        value: routeBuild.source
-      });
-    }
-  }
-
-  if (context.partialErrors?.graphNodes) {
-    checks.push({
-      status: "warn",
-      title: "Network graph lookup",
-      detail: `Could not read graph nodes: ${context.partialErrors.graphNodes.message}`
-    });
-  } else if (targetPubkey) {
-    checks.push({
-      status:
-        graphMatch || routeProbe.routeFound || routeBuild.status === "ready"
-          ? graphMatch
-            ? "pass"
-            : "warn"
-          : "fail",
-      title: "Target in graph",
-      detail: graphMatch
-        ? "The target pubkey was found in the Fiber network graph."
-        : routeProbe.routeFound || routeBuild.status === "ready"
-          ? "The graph snapshot missed the target pubkey, but Fiber still built a usable route from this sender. Treat graph visibility as stale, partial, or private-path evidence."
-          : "The target pubkey was not found in the current Fiber network graph snapshot."
-    });
-    evidence.push({ label: "Target pubkey", value: targetPubkey });
-  }
-
-  if (looksLikePeerId(request.targetPubkey)) {
-    checks.push({
-      status: "warn",
-      title: "Target identifier",
-      detail:
-        "The target looks like a legacy peer_id. Fiber v0.8.0+ expects pubkey values in RPC calls."
-    });
-    evidence.push({ label: "Target value", value: request.targetPubkey });
-  }
+  addRouteProbeFindings(checks, evidence, routeProbe);
+  addRouteBuildFindings(checks, evidence, routeBuild);
+  addGraphFindings(checks, evidence, context, targetPubkey, graphMatch, routeProbe, routeBuild);
+  addPeerIdFinding(checks, evidence, request.targetPubkey);
 
   let classification = {
     headline:
@@ -590,6 +437,215 @@ export function analyzeInvoice(parsedInvoice, request) {
     description: extractInvoiceDescription(invoice),
     expiryTimestamp
   };
+}
+
+function addMultiNodeFindings(checks, evidence, multiNode) {
+  if (!multiNode.enabled) {
+    return;
+  }
+
+  const routeEvidence = [];
+  if (multiNode.probeReadyNodes > 0) {
+    routeEvidence.push(`${multiNode.probeReadyNodes} ready`);
+  }
+  if (multiNode.probeBlockedNodes > 0) {
+    routeEvidence.push(`${multiNode.probeBlockedNodes} blocked`);
+  }
+  if (multiNode.probeSkippedNodes > 0) {
+    routeEvidence.push(`${multiNode.probeSkippedNodes} skipped`);
+  }
+
+  checks.push({
+    status: multiNode.reachableNodes > 0 ? "pass" : "fail",
+    title: "Multi-node coverage",
+    detail: `${multiNode.reachableNodes}/${multiNode.nodeCount} node(s) responded${routeEvidence.length ? `; probes: ${routeEvidence.join(", ")}.` : "."}`
+  });
+
+  evidence.push({
+    label: "Nodes analyzed",
+    value: `${multiNode.nodeCount}`
+  });
+
+  if (multiNode.consistentProbeStatus === false) {
+    checks.push({
+      status: "warn",
+      title: "Cross-node consistency",
+      detail:
+        "Different nodes reported different route readiness for the same request, which usually means local liquidity or graph visibility differs by sender."
+    });
+  }
+}
+
+function addChannelFindings(checks, evidence, context, channels, openChannels) {
+  if (context.partialErrors?.channels) {
+    checks.push({
+      status: "warn",
+      title: "Channel read",
+      detail: `Could not read channels: ${context.partialErrors.channels.message}`
+    });
+    return;
+  }
+
+  if (channels.length === 0) {
+    checks.push({
+      status: "fail",
+      title: "Open channels",
+      detail: "No channel data is available, so outbound liquidity may be zero."
+    });
+    return;
+  }
+
+  checks.push({
+    status: openChannels.length > 0 ? "pass" : "warn",
+    title: "Open channels",
+    detail:
+      openChannels.length > 0
+        ? `${openChannels.length} open channel(s) detected.`
+        : "Channels were returned, but none look open or ready."
+  });
+  evidence.push({
+    label: "Open channels",
+    value: String(openChannels.length)
+  });
+}
+
+function addRouteProbeFindings(checks, evidence, routeProbe) {
+  if (!routeProbe.supported) {
+    return;
+  }
+
+  if (routeProbe.routeFound) {
+    checks.push({
+      status: "pass",
+      title: "Route probe",
+      detail:
+        "Fiber send_payment dry-run accepted this target and amount without sending a payment."
+    });
+    evidence.push({
+      label: "Route probe",
+      value: routeProbe.source || PROBE_METHOD_LABEL
+    });
+    evidence.push({
+      label: "Route proof",
+      value: "Confirmed by real Fiber dry run"
+    });
+    if (routeProbe.paymentHash) {
+      evidence.push({
+        label: "Probe payment hash",
+        value: routeProbe.paymentHash
+      });
+    }
+    if (routeProbe.hops.length > 0) {
+      evidence.push({
+        label: "Probe hops",
+        value: String(routeProbe.hops.length)
+      });
+    }
+    return;
+  }
+
+  if (routeProbe.blockingError) {
+    checks.push({
+      status: "fail",
+      title: "Route probe",
+      detail: routeProbe.blockingError
+    });
+    evidence.push({
+      label: "Route probe",
+      value: routeProbe.source || PROBE_METHOD_LABEL
+    });
+  }
+}
+
+function addRouteBuildFindings(checks, evidence, routeBuild) {
+  if (!routeBuild.supported) {
+    return;
+  }
+
+  const successfulCandidates = routeBuild.candidates.filter(
+    (candidate) => candidate.status === "ready"
+  );
+  if (successfulCandidates.length > 0) {
+    checks.push({
+      status: "pass",
+      title: "Route builder",
+      detail: `Fiber build_router constructed ${successfulCandidates.length} constrained route candidate(s) for this target and amount.`
+    });
+    evidence.push({
+      label: "Route builder",
+      value: routeBuild.source
+    });
+    evidence.push({
+      label: "Route candidates",
+      value: String(successfulCandidates.length)
+    });
+    return;
+  }
+
+  if (routeBuild.blockingError) {
+    checks.push({
+      status: "warn",
+      title: "Route builder",
+      detail: routeBuild.blockingError
+    });
+    evidence.push({
+      label: "Route builder",
+      value: routeBuild.source
+    });
+  }
+}
+
+function addGraphFindings(
+  checks,
+  evidence,
+  context,
+  targetPubkey,
+  graphMatch,
+  routeProbe,
+  routeBuild
+) {
+  if (context.partialErrors?.graphNodes) {
+    checks.push({
+      status: "warn",
+      title: "Network graph lookup",
+      detail: `Could not read graph nodes: ${context.partialErrors.graphNodes.message}`
+    });
+    return;
+  }
+
+  if (!targetPubkey) {
+    return;
+  }
+
+  checks.push({
+    status:
+      graphMatch || routeProbe.routeFound || routeBuild.status === "ready"
+        ? graphMatch
+          ? "pass"
+          : "warn"
+        : "fail",
+    title: "Target in graph",
+    detail: graphMatch
+      ? "The target pubkey was found in the Fiber network graph."
+      : routeProbe.routeFound || routeBuild.status === "ready"
+        ? "The graph snapshot missed the target pubkey, but Fiber still built a usable route from this sender. Treat graph visibility as stale, partial, or private-path evidence."
+        : "The target pubkey was not found in the current Fiber network graph snapshot."
+  });
+  evidence.push({ label: "Target pubkey", value: targetPubkey });
+}
+
+function addPeerIdFinding(checks, evidence, targetPubkey) {
+  if (!looksLikePeerId(targetPubkey)) {
+    return;
+  }
+
+  checks.push({
+    status: "warn",
+    title: "Target identifier",
+    detail:
+      "The target looks like a legacy peer_id. Fiber v0.8.0+ expects pubkey values in RPC calls."
+  });
+  evidence.push({ label: "Target value", value: targetPubkey });
 }
 
 function buildRpcFailureDiagnosis({ context, request, source, scenario }) {

@@ -26,8 +26,10 @@ Options:
   --target-pubkey <pubkey>
   --endpoint <url>
   --token <bearer-token>
+  --analysis-depth standard|deep
   --output-mode full|machine|operator|backend|wallet
   --history-path <file>
+  --history-backend json-file|ndjson-file
   --input <file>
   --multi-node
   --help
@@ -43,8 +45,10 @@ const { values } = parseArgs({
     "target-pubkey": { type: "string" },
     endpoint: { type: "string" },
     token: { type: "string" },
+    "analysis-depth": { type: "string" },
     "output-mode": { type: "string" },
     "history-path": { type: "string" },
+    "history-backend": { type: "string" },
     input: { type: "string" },
     "multi-node": { type: "boolean" },
     help: { type: "boolean" }
@@ -68,12 +72,15 @@ if (!validation.ok) {
 
 const config = createFiberOpsConfig({
   defaultEndpoint: values.endpoint || undefined,
-  historyPath: values["history-path"] || undefined
+  historyPath: values["history-path"] || undefined,
+  historyBackend: values["history-backend"] || undefined
 });
 
 const result = await runDiagnosis(validation.value, {
   defaultEndpoint: config.defaultEndpoint,
   historyPath: values["history-path"] || undefined,
+  historyBackend: values["history-backend"] || undefined,
+  analysisDepth: validation.value.analysisDepth,
   nodeSet: values["multi-node"] ? getLocalLabNodeSet(config) : undefined
 });
 
@@ -103,6 +110,7 @@ async function loadPayload(cliValues) {
     targetPubkey: cliValues["target-pubkey"],
     endpoint: cliValues.endpoint,
     token: cliValues.token,
+    analysisDepth: cliValues["analysis-depth"],
     outputMode: cliValues["output-mode"]
   };
 }

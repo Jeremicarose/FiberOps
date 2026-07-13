@@ -31,6 +31,20 @@ export async function buildHistoryInsights({
       endpoint: node.endpoint,
       summary: node.summary,
       probe: node.probe,
+      diagnosis: node.diagnosis
+        ? {
+            category: node.diagnosis.category,
+            severity: node.diagnosis.severity,
+            headline: node.diagnosis.headline
+          }
+        : null,
+      routePreview: node.routePreview
+        ? {
+            status: node.routePreview.status,
+            evidenceMode: node.routePreview.evidenceMode,
+            blockingReason: node.routePreview.blockingReason
+          }
+        : null,
       error: node.error
     }))
   };

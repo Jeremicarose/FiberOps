@@ -1,74 +1,136 @@
 # FiberOps | Fiber on CKB Operator Console
 
-FiberOps is a read-only Fiber diagnostics console for operator debugging, backend preflight checks, and judge-friendly demos. It exposes the same diagnostics surface through a browser UI, HTTP API, CLI, and reusable library exports.
+FiberOps is a read-only diagnostics console for Fiber on CKB that turns raw node state into an operator-friendly explanation of what failed, what evidence is real, and what to do next.
+
+## Problem
+
+Fiber payments do not fail in a way that is easy for operators, hackathon judges, or backend developers to understand.
+
+When a payment breaks, the root cause is usually scattered across low-level RPC reads such as channel state, outbound liquidity, graph visibility, invoice validity, payment lifecycle state, and route-readiness evidence. That creates a practical gap:
+
+**Fiber has the raw signals, but not an operator-first diagnostic surface that turns those signals into an actionable explanation.**
+
+FiberOps exists to close that gap.
+
+## Solution
+
+FiberOps provides a single diagnostics engine through four surfaces:
+
+- **Browser UI** for demos and operator workflows
+- **HTTP API** for backend integration
+- **CLI** for scripted diagnostics
+- **Library exports** for embedding in other tools
+
+It is designed to answer a small set of operational questions clearly:
+
+- What failed?
+- Why did it fail?
+- Is the route currently ready?
+- Is that conclusion based on real, heuristic, or fixture evidence?
+- Do multiple live nodes agree on the result?
+- What should the operator do next?
+
+FiberOps is not a wallet and not a payment sender UI. It is an operator console for understanding Fiber routing behavior safely.
+
+Key architectural properties:
+
+- live execution resolves the actual node set first, validates every resolved node against policy, then runs diagnosis
+- per-node diagnosis is computed before aggregate selection, so the top-level result stays anchored to a selected node instead of mixing evidence from different senders
+- route evidence is explicit: heuristic, invoice dry run, keysend-style dry run, or opt-in deep route-build analysis
+- history persistence is behind a backend seam with a compatible JSON backend and an append-safe NDJSON backend
+
+## Screenshots
+
+### Guided proof flow
+
+![FiberOps guided home](docs/screenshots/guided-home.png)
+
+### Blocked route diagnosis
+
+![FiberOps blocked route diagnosis](docs/screenshots/blocked-route-diagnosis.png)
+
+### Degraded RPC failure state
+
+![FiberOps degraded RPC failure state](docs/screenshots/degraded-rpc-failure.png)
 
 ## Quick start
 
+### Prerequisites
+
+- Node.js 20+
+- npm
+- Playwright Chromium for browser smoke coverage
+
+### Local lab flow
+
 ```bash
-npm install
+npm ci
 npm run lab:reset
 npm run lab:prepare
 npm run lab:check
 npm run dev
 ```
 
-Then open `http://localhost:3000`.
+Open `http://localhost:3000`.
 
-If you need to start the bundled lab nodes directly, use:
+For local configuration templates, see `.env.example` and `examples/live-node-set.json`.
 
-```bash
-FIBER_SECRET_KEY_PASSWORD=... ./scripts/start-node1.sh
-FIBER_SECRET_KEY_PASSWORD=... ./scripts/start-node2.sh
-```
+## Usage overview
 
-Both wrappers now delegate to `scripts/start-node.sh` so the node-start workflow stays consistent.
+### Browser UI
 
-## Quality gates
+Use the browser app to:
 
-```bash
-npm run test:diagnostics
-npm run test:contracts
-npx playwright install chromium
-npm run test:browser
-npm run test:all
-npm run check
-```
+- run demo scenarios
+- inspect live node readiness
+- compare multi-node perspectives
+- review route preview evidence
+- inspect backend history when enabled
 
-`npm run check` is the full reviewer path: formatting, typecheck, diagnostics/API integration coverage, and browser smoke coverage.
-
-`build` is a validation build for this plain-ESM package and currently uses `npm pack --dry-run` rather than introducing a bundling step.
-
-## Main surfaces
-
-- UI: `public/index.html`, `public/app.js`, `public/styles.css`
-- HTTP app: `src/lib/server-app.js`
-- Runtime launcher: `src/server.js`
-- CLI: `src/cli.js`
-- Diagnostics package: `src/lib/diagnostics/`
-
-## API summary
+### HTTP API
 
 Main endpoints:
 
 - `GET /api/bootstrap`
 - `POST /api/diagnose`
+- `GET /api/health`
+- `GET /api/metrics`
 - `GET /api/contracts/diagnose`
 - `GET /api/contracts/diagnose/request`
 - `GET /api/contracts/diagnose/result`
 - `GET /api/contracts/diagnose/rules`
 
-All API routes return explicit success/error envelopes. The browser client now handles non-2xx bootstrap and diagnose responses explicitly and renders degraded state instead of silently breaking.
+All routes return explicit envelopes:
 
-`POST /api/diagnose` now also enforces a request policy layer while keeping the published envelopes stable:
+- success: `{ ok, data, meta }`
+- failure: `{ ok, error, meta }`
 
-- `content-type: application/json` is required
-- oversized JSON bodies are rejected with structured errors
-- malformed JSON returns an explicit invalid-request envelope
-- live mode allows loopback/local lab endpoints by default
-- arbitrary external live endpoints require explicit server policy opt-in
-- bearer tokens are blocked on obviously unsafe transports unless explicitly allowed
+Example request:
 
-## Reusable interfaces
+```bash
+curl -X POST http://127.0.0.1:3000/api/diagnose \
+  -H 'content-type: application/json' \
+  -d '{
+    "mode": "demo",
+    "scenarioId": "preflight-liquidity-block"
+  }'
+```
+
+Optional live-analysis fields:
+
+- `analysisDepth`: `standard` or `deep`
+- `outputMode`: `full`, `machine`, `operator`, `backend`, or `wallet`
+
+`standard` keeps live diagnosis fast and compatible. `deep` opt-ins to `graph_channels` and `build_router` analysis.
+
+### CLI
+
+```bash
+npm run diagnose -- --mode demo --scenario-id route-build-failure
+npm run diagnose -- --mode demo --scenario-id preflight-liquidity-block --output-mode operator
+npm run diagnose -- --mode live --endpoint http://127.0.0.1:8227 --amount 10000000000 --target-pubkey <pubkey> --analysis-depth deep
+cat payload.json | npm run diagnose -- --output-mode backend
+```
 
 ### Library
 
@@ -80,59 +142,42 @@ import {
 } from "fiberops/diagnostics";
 ```
 
-### CLI
-
-```bash
-npm run diagnose -- --mode demo --scenario-id route-build-failure
-npm run diagnose -- --mode demo --scenario-id preflight-liquidity-block --output-mode operator
-cat payload.json | npm run diagnose -- --output-mode backend
-```
-
 ## Documentation index
 
-- [Architecture](docs/architecture.md)
-- [Failure modes](docs/failure-modes.md)
-- [Contracts](docs/contracts.md)
-- [Runtime model](docs/runtime-model.md)
-- [Local lab runbook](docs/local-lab-runbook.md)
-- [End-to-end validation](docs/e2e-validation.md)
+Start here:
 
-## Demo media
+- [Developer guide](docs/developer-guide.md) — contributor and integrator overview
+- [Architecture](docs/architecture.md) — system structure and request flow
+- [Contracts](docs/contracts.md) — request, result, and compatibility model
+- [Runtime model](docs/runtime-model.md) — evidence tiers and runtime semantics
+- [Failure modes](docs/failure-modes.md) — diagnosis taxonomy and operator actions
+- [Local lab runbook](docs/local-lab-runbook.md) — prepare and operate the bundled lab
+- [End-to-end validation](docs/e2e-validation.md) — validation paths for UI, API, and live lab workflows
+- [Release process](docs/release-process.md) — release checklist and tagging flow
 
-- Judge walkthrough script: `docs/e2e-validation.md#guided-judge-demo`
-- Hosted demo instructions: `docs/local-lab-runbook.md`
+Suggested reading paths:
 
-## Runtime policy and persistence
+- **New to FiberOps:** README -> Developer guide -> Architecture
+- **Integrating the API:** README -> Developer guide -> Contracts -> Runtime model
+- **Running the local lab:** README -> Local lab runbook -> End-to-end validation
+- **Debugging a failure:** README -> Failure modes -> Runtime model -> Contracts
 
-Environment variables and runtime assumptions:
+## Contributing
 
-- `FIBER_RPC_URL` / `FIBER_RPC_URL_NODE2`: default local lab endpoints
-- `FIBEROPS_NODE_SET_JSON`: explicit multi-node live configuration
-- `FIBEROPS_HISTORY_PATH`: enables backend history persistence when set
-- `FIBEROPS_MAX_JSON_BODY_BYTES`: JSON API body limit
-- `FIBEROPS_ALLOW_EXTERNAL_LIVE_ENDPOINTS=true`: allow non-loopback live endpoints
-- `FIBEROPS_ALLOW_INSECURE_TOKEN_FORWARDING=true`: allow bearer tokens to non-HTTPS/non-loopback endpoints
-- `FIBEROPS_ROUTE_PROBE_ENABLED=false`: disable live route probing
+Contribution workflow and repository policy live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Persistence states:
+Before opening a pull request:
 
-- disabled: `FIBEROPS_HISTORY_PATH` is unset
-- enabled/healthy: path is configured and reads/writes succeed
-- enabled/degraded: path is configured but history read/write fails; diagnosis still succeeds and history remains non-fatal
+1. describe the operator problem being solved
+2. keep the change focused and evidence-driven
+3. run `npm run test:all`
+4. run `npm run check`
+5. update docs, examples, and screenshots when user-facing behavior changes
 
-Backend history writes are serialized and written through unique temp files so concurrent requests do not race on the persistence file.
+## Release
 
-## Live mode notes
+Release guidance lives in [docs/release-process.md](docs/release-process.md).
 
-- Fiber RPC uses JSON-RPC over HTTP
-- methods with no arguments send `params: []`
-- if auth is enabled, use a read-scoped Biscuit bearer token
-- request aborts now propagate through live diagnostics into RPC fetches
-- multi-node live diagnostics now run concurrently with a bounded fan-out
-- `tests/live-integration.test.js` remains opt-in
+## License
 
-## External references
-
-- [RPC Overview](https://www.fiber.world/docs/api-reference)
-- [Troubleshooting](https://www.fiber.world/docs/faq/troubleshooting)
-- [JavaScript SDK](https://www.fiber.world/docs/build/sdk/js)
+FiberOps is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).

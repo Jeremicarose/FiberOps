@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "Fiber payment diagnostics and readiness checker",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Jeremicarose/FiberOps#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jeremicarose/FiberOps.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Jeremicarose/FiberOps/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",

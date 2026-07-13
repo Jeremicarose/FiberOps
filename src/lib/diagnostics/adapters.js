@@ -39,8 +39,13 @@ export function toMachineExport(result) {
     requestedAmount: result.routePreview?.requestedAmount || null,
     estimatedOutbound: result.routePreview?.estimatedOutbound || null,
     blockingReason: result.routePreview?.blockingReason || null,
+    selectedNodeId:
+      result.selectedNodeId || result.execution?.selectedNodeId || null,
+    aggregateStatus:
+      result.aggregateStatus || result.execution?.aggregateStatus || null,
     nextActions: result.diagnosis?.nextActions || [],
     tags: result.event?.tags || [],
+    execution: result.execution || null,
     alerts: (result.alerts || []).map((alert) => ({
       severity: alert.severity,
       cause: alert.cause,
@@ -66,9 +71,14 @@ export function toOperatorExport(result) {
       readiness: result.summary?.paymentReadiness || null,
       routeStatus: result.routePreview?.status || null,
       blockingReason: result.routePreview?.blockingReason || null,
+      selectedNodeId:
+        result.selectedNodeId || result.execution?.selectedNodeId || null,
+      aggregateStatus:
+        result.aggregateStatus || result.execution?.aggregateStatus || null,
       primaryAction: result.diagnosis?.nextActions?.[0] || null,
       topAlert: result.alerts?.[0] || null
     },
+    execution: result.execution || null,
     checks: result.diagnosis?.checks || [],
     evidence: result.diagnosis?.evidence || [],
     references: result.diagnosis?.references || []
@@ -84,10 +94,15 @@ export function toBackendExport(result) {
       severity: result.diagnosis?.severity || null,
       readiness: result.summary?.paymentReadiness || null,
       routeStatus: result.routePreview?.status || null,
+      selectedNodeId:
+        result.selectedNodeId || result.execution?.selectedNodeId || null,
+      aggregateStatus:
+        result.aggregateStatus || result.execution?.aggregateStatus || null,
       endpoint: result.summary?.endpoint || result.event?.endpoint || null,
       source: result.source
     },
     event: result.event || null,
+    execution: result.execution || null,
     metrics: {
       openChannels: result.summary?.openChannels ?? null,
       readyChannels: result.summary?.readyChannels ?? null,
@@ -123,8 +138,11 @@ export function toWalletExport(result) {
       invoiceExpired: result.summary?.invoiceExpired ?? null,
       targetInGraph: result.summary?.targetInGraph ?? null,
       targetVisibility: result.summary?.targetVisibility ?? null,
-      routeProof: result.summary?.routeProof ?? null
+      routeProof: result.summary?.routeProof ?? null,
+      selectedNodeId:
+        result.selectedNodeId || result.execution?.selectedNodeId || null
     },
+    execution: result.execution || null,
     advice: (result.diagnosis?.nextActions || []).slice(0, 3)
   };
 }

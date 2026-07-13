@@ -8,10 +8,18 @@ import {
   getBootstrapData,
   getContractBundle,
   getRuleCatalog,
+  getRuntimeStatus,
   runDiagnosis,
   validateDiagnosisRequest
 } from "./diagnostics.js";
 import { FiberRpcError } from "./fiber-rpc.js";
+import { createHistoryBackend } from "./history-backend.js";
+import { createObservability, redactForLogs } from "./observability.js";
+import {
+  resolveExecutionPlan,
+  summarizeExecutionPlan,
+  validateExecutionPlan
+} from "./server/execution-plan.js";
 import {
   REQUEST_POLICY_ERROR_CODES,
   RequestPolicyError,
@@ -53,6 +61,11 @@ export function createFiberOpsConfig(overrides = {}) {
     overrides.node2Endpoint ||
     process.env.FIBER_RPC_URL_NODE2 ||
     "http://127.0.0.1:8237";
+  const port = Number(overrides.port || process.env.PORT || 3000);
+
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error("PORT must be a valid integer between 1 and 65535.");
+  }
   const usingBundledLab = shouldUseBundledLab(
     overrides,
     defaultEndpoint,
@@ -71,6 +84,10 @@ export function createFiberOpsConfig(overrides = {}) {
       : process.env.FIBEROPS_HISTORY_PATH
         ? process.env.FIBEROPS_HISTORY_PATH
         : null;
+  const historyBackend =
+    overrides.historyBackend ||
+    process.env.FIBEROPS_HISTORY_BACKEND ||
+    "json-file";
   const environmentFacts = buildEnvironmentFacts({
     overrides,
     nodeSet,
@@ -92,15 +109,21 @@ export function createFiberOpsConfig(overrides = {}) {
 
   return {
     host: overrides.host || process.env.HOST || "127.0.0.1",
-    port: Number(overrides.port || process.env.PORT || 3000),
+    port,
     publicDir,
     runtimeDir,
     historyPath,
+    historyBackend,
     defaultEndpoint,
     node2Endpoint,
     nodeSet,
     environmentFacts,
-    requestPolicy
+    requestPolicy,
+    observability:
+      overrides.observability ||
+      createObservability({
+        enabled: overrides.observabilityEnabled !== false
+      })
   };
 }
 
@@ -110,21 +133,52 @@ export function createFiberOpsServer(config = createFiberOpsConfig()) {
   );
 }
 
+function getConfiguredHistoryBackend(config) {
+  return createHistoryBackend({
+    historyBackend: isHistoryBackendInstance(config.historyBackend)
+      ? config.historyBackend
+      : config.historyBackend,
+    historyStore: config.historyStore,
+    historyPath: config.historyPath
+  });
+}
+
 export async function handleFiberOpsRequest(
   request,
   response,
   config = createFiberOpsConfig()
 ) {
+  const observability = config.observability || createObservability();
+  const requestContext = observability.createRequestContext({
+    method: request.method,
+    route: safeRouteFromRequest(request)
+  });
+  let responseStatusCode = 200;
+  let normalizedErrorClass = null;
+  const originalWriteHead =
+    typeof response.writeHead === "function"
+      ? response.writeHead.bind(response)
+      : null;
+  if (originalWriteHead) {
+    response.writeHead = (statusCode, ...args) => {
+      responseStatusCode = statusCode;
+      return originalWriteHead(statusCode, ...args);
+    };
+  }
+  observability.recordRequestStart(requestContext);
+
   try {
     const url = new URL(request.url || "/", "http://fiberops.local");
     const route = url.pathname || "/";
+    requestContext.route = route;
 
     if (request.method === "GET" && url.pathname === "/api/bootstrap") {
       return sendJson(
         response,
         200,
         successEnvelope(await buildBootstrapPayload(config), {
-          route: "/api/bootstrap"
+          route: "/api/bootstrap",
+          requestId: requestContext.id
         })
       );
     }
@@ -224,30 +278,339 @@ export async function handleFiberOpsRequest(
       }
 
       const payload = validation.value;
+      let executionPlan = null;
       if (payload.mode === "live") {
+        executionPlan = validateExecutionPlan(
+          resolveExecutionPlan({
+            payload,
+            configuredNodes: getConfiguredNodeSet(config),
+            defaultEndpoint: config.defaultEndpoint
+          }),
+          config.requestPolicy || {},
+          {
+            defaultEndpoint: config.defaultEndpoint
+          }
+        );
+      } else if (payload.endpoint) {
         validateLiveEndpointPolicy(payload, config.requestPolicy || {}, {
           defaultEndpoint: config.defaultEndpoint
         });
       }
       const result = await runDiagnosis(payload, {
         defaultEndpoint: config.defaultEndpoint,
-        nodeSet: getConfiguredNodeSet(config),
-        historyPath: config.historyPath,
+        nodeSet: executionPlan?.nodes || getConfiguredNodeSet(config),
+        historyBackend: getConfiguredHistoryBackend(config),
         routeProbeEnabled: config.requestPolicy?.routeProbeEnabled !== false,
+        analysisDepth: payload.analysisDepth,
+        executionPlan,
         signal: createRequestAbortSignal(request),
-        endpointPolicy: config.requestPolicy
+        endpointPolicy: config.requestPolicy,
+        observability,
+        runContext: {
+          requestId: requestContext.id,
+          observability
+        }
       });
+      if (executionPlan) {
+        result.execution = {
+          ...(result.execution || {}),
+          ...summarizeExecutionPlan(executionPlan)
+        };
+      }
       return sendJson(
         response,
         200,
         successEnvelope(formatDiagnosisOutput(result, payload.outputMode), {
           route,
-          outputMode: payload.outputMode
+          outputMode: payload.outputMode,
+          requestId: requestContext.id
         })
       );
     }
 
+    if (request.method === "GET" && url.pathname === "/api/runtime/status") {
+      const runtimeStatus = await getRuntimeStatus({
+        historyBackend: getConfiguredHistoryBackend(config),
+        observability
+      });
+      return sendJson(
+        response,
+        200,
+        successEnvelope(runtimeStatus, {
+          route: "/api/runtime/status",
+          requestId: requestContext.id
+        })
+      );
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/environment") {
+      return sendJson(
+        response,
+        200,
+        successEnvelope(
+          {
+            ...config.environmentFacts,
+            defaultEndpoint: config.defaultEndpoint,
+            configuredNodes: getConfiguredNodeSet(config)
+          },
+          {
+            route: "/api/environment",
+            requestId: requestContext.id
+          }
+        )
+      );
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/observability") {
+      return sendJson(
+        response,
+        200,
+        successEnvelope(observability.snapshot(), {
+          route: "/api/observability",
+          requestId: requestContext.id
+        })
+      );
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/history/status") {
+      return sendJson(
+        response,
+        200,
+        successEnvelope(
+          await getRuntimeStatus({
+            historyBackend: getConfiguredHistoryBackend(config),
+            observability
+          }).then((status) => status.history),
+          {
+            route: "/api/history/status",
+            requestId: requestContext.id
+          }
+        )
+      );
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/history/recent") {
+      const historyBackend = getConfiguredHistoryBackend(config);
+      const recent = historyBackend ? await historyBackend.listRecent(20) : [];
+      return sendJson(
+        response,
+        200,
+        successEnvelope(recent, {
+          route: "/api/history/recent",
+          requestId: requestContext.id
+        })
+      );
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/history/related") {
+      const historyBackend = getConfiguredHistoryBackend(config);
+      const eventId = url.searchParams.get("eventId") || "";
+      const recent = historyBackend ? await historyBackend.listRecent(50) : [];
+      const current = recent.find((item) => item.event?.id === eventId) || null;
+      const related =
+        current && historyBackend
+          ? await historyBackend.findRelated(current, { limit: 10 })
+          : [];
+      return sendJson(
+        response,
+        200,
+        successEnvelope(
+          {
+            recent,
+            related
+          },
+          {
+            route: "/api/history/related",
+            requestId: requestContext.id
+          }
+        )
+      );
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/diagnose/plan") {
+      requireJsonContentType(request);
+      const rawPayload = await readJsonBody(request, {
+        maxBytes: config.requestPolicy?.maxJsonBodyBytes
+      });
+      const validation = validateDiagnosisRequest(rawPayload);
+      if (!validation.ok) {
+        return sendJson(
+          response,
+          400,
+          errorEnvelope(
+            "INVALID_REQUEST",
+            "Invalid diagnosis request.",
+            {
+              details: validation.errors
+            },
+            {
+              route,
+              requestId: requestContext.id
+            }
+          )
+        );
+      }
+      const payload = validation.value;
+      const executionPlan =
+        payload.mode === "live"
+          ? validateExecutionPlan(
+              resolveExecutionPlan({
+                payload,
+                configuredNodes: getConfiguredNodeSet(config),
+                defaultEndpoint: config.defaultEndpoint
+              }),
+              config.requestPolicy || {},
+              {
+                defaultEndpoint: config.defaultEndpoint
+              }
+            )
+          : null;
+      return sendJson(
+        response,
+        200,
+        successEnvelope(
+          {
+            request: payload,
+            execution: executionPlan
+              ? summarizeExecutionPlan(executionPlan)
+              : null
+          },
+          {
+            route: "/api/diagnose/plan",
+            requestId: requestContext.id
+          }
+        )
+      );
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/routing/preview") {
+      requireJsonContentType(request);
+      const rawPayload = await readJsonBody(request, {
+        maxBytes: config.requestPolicy?.maxJsonBodyBytes
+      });
+      const validation = validateDiagnosisRequest(rawPayload);
+      if (!validation.ok) {
+        return sendJson(
+          response,
+          400,
+          errorEnvelope(
+            "INVALID_REQUEST",
+            "Invalid routing preview request.",
+            {
+              details: validation.errors
+            },
+            {
+              route,
+              requestId: requestContext.id
+            }
+          )
+        );
+      }
+      const payload = validation.value;
+      let executionPlan = null;
+      if (payload.mode === "live") {
+        executionPlan = validateExecutionPlan(
+          resolveExecutionPlan({
+            payload,
+            configuredNodes: getConfiguredNodeSet(config),
+            defaultEndpoint: config.defaultEndpoint
+          }),
+          config.requestPolicy || {},
+          {
+            defaultEndpoint: config.defaultEndpoint
+          }
+        );
+      }
+      const result = await runDiagnosis(payload, {
+        defaultEndpoint: config.defaultEndpoint,
+        nodeSet: executionPlan?.nodes || getConfiguredNodeSet(config),
+        historyBackend: getConfiguredHistoryBackend(config),
+        routeProbeEnabled: config.requestPolicy?.routeProbeEnabled !== false,
+        analysisDepth: payload.analysisDepth,
+        executionPlan,
+        signal: createRequestAbortSignal(request),
+        endpointPolicy: config.requestPolicy,
+        observability,
+        runContext: {
+          requestId: requestContext.id,
+          observability
+        }
+      });
+      return sendJson(
+        response,
+        200,
+        successEnvelope(
+          {
+            routePreview: result.routePreview,
+            summary: result.summary,
+            diagnosis: result.diagnosis,
+            execution: result.execution || null
+          },
+          {
+            route: "/api/routing/preview",
+            requestId: requestContext.id
+          }
+        )
+      );
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/nodes") {
+      const payload = { mode: "live", analysisDepth: "deep" };
+      const executionPlan = validateExecutionPlan(
+        resolveExecutionPlan({
+          payload,
+          configuredNodes: getConfiguredNodeSet(config),
+          defaultEndpoint: config.defaultEndpoint
+        }),
+        config.requestPolicy || {},
+        {
+          defaultEndpoint: config.defaultEndpoint
+        }
+      );
+      const result = await runDiagnosis(payload, {
+        defaultEndpoint: config.defaultEndpoint,
+        nodeSet: executionPlan.nodes,
+        historyBackend: getConfiguredHistoryBackend(config),
+        routeProbeEnabled: config.requestPolicy?.routeProbeEnabled !== false,
+        analysisDepth: "deep",
+        executionPlan,
+        signal: createRequestAbortSignal(request),
+        endpointPolicy: config.requestPolicy,
+        observability,
+        runContext: {
+          requestId: requestContext.id,
+          observability
+        }
+      });
+      return sendJson(
+        response,
+        200,
+        successEnvelope(
+          {
+            aggregateStatus:
+              result.aggregateStatus ||
+              result.execution?.aggregateStatus ||
+              null,
+            selectedNodeId:
+              result.selectedNodeId || result.execution?.selectedNodeId || null,
+            nodes: (result.nodes || []).map((node) => ({
+              ...node,
+              channels: extractNodeChannels(node)
+            }))
+          },
+          {
+            route: "/api/nodes",
+            requestId: requestContext.id
+          }
+        )
+      );
+    }
+
     if (request.method === "GET" && url.pathname === "/api/health") {
+      const runtimeStatus = await getRuntimeStatus({
+        historyBackend: getConfiguredHistoryBackend(config),
+        observability
+      });
       return sendJson(
         response,
         200,
@@ -255,7 +618,17 @@ export async function handleFiberOpsRequest(
           {
             service: "fiberops",
             defaultEndpoint: config.defaultEndpoint,
-            historyPersistence: Boolean(config.historyPath),
+            uptimeMs: runtimeStatus.observability?.uptimeMs || 0,
+            observability: {
+              enabled: Boolean(observability.enabled)
+            },
+            historyPersistence: runtimeStatus.history.enabled,
+            historyBackend: runtimeStatus.history,
+            recentCounters: {
+              requests:
+                runtimeStatus.observability?.requests?.recent?.requests || 0,
+              errors: runtimeStatus.observability?.requests?.recent?.errors || 0
+            },
             policy: {
               allowExternalLiveEndpoints:
                 config.requestPolicy?.allowExternalLiveEndpoints ?? false,
@@ -267,14 +640,31 @@ export async function handleFiberOpsRequest(
             }
           },
           {
-            route: "/api/health"
+            route: "/api/health",
+            requestId: requestContext.id
           }
         )
       );
     }
 
+    if (request.method === "GET" && url.pathname === "/api/metrics") {
+      return sendJson(
+        response,
+        200,
+        successEnvelope(observability.snapshot(), {
+          route: "/api/metrics",
+          requestId: requestContext.id
+        })
+      );
+    }
+
     if (request.method === "GET") {
-      return sendStatic(url.pathname || "/", response, config.publicDir);
+      return sendStatic(
+        url.pathname || "/",
+        response,
+        config.publicDir,
+        request.url || "/"
+      );
     }
 
     sendJson(
@@ -285,35 +675,32 @@ export async function handleFiberOpsRequest(
       })
     );
   } catch (error) {
-    const route = (() => {
-      try {
-        return (
-          new URL(request.url || "/", "http://fiberops.local").pathname || "/"
-        );
-      } catch {
-        return "/";
-      }
-    })();
+    const route = safeRouteFromRequest(request);
     const failure = classifyServerError(error, route);
+    normalizedErrorClass = failure.code;
     sendJson(
       response,
       failure.statusCode,
-      errorEnvelope(
-        failure.code,
-        failure.message,
-        failure.details,
-        failure.meta
-      )
+      errorEnvelope(failure.code, failure.message, failure.details, {
+        ...failure.meta,
+        requestId: requestContext.id
+      })
     );
+  } finally {
+    observability.recordRequestComplete(requestContext, {
+      statusCode: responseStatusCode,
+      errorClass: normalizedErrorClass
+    });
   }
 }
 
 export async function buildBootstrapPayload(config = createFiberOpsConfig()) {
   await mkdir(config.runtimeDir, { recursive: true });
-  const base = getBootstrapData(config.defaultEndpoint, {
-    historyPath: config.historyPath,
+  const base = await getBootstrapData(config.defaultEndpoint, {
+    historyBackend: getConfiguredHistoryBackend(config),
     nodeSet: getConfiguredNodeSet(config),
-    requestPolicy: config.requestPolicy
+    requestPolicy: config.requestPolicy,
+    observability: config.observability
   });
   const livePresets = await getLivePresets(config);
 
@@ -403,8 +790,9 @@ async function getLivePresets(config) {
   }
 
   for (const node of nodeSet) {
-    const latestInvoice = await tryReadJson(
-      path.join(config.runtimeDir, node.id, "latest-invoice.json")
+    const latestInvoice = await tryReadRuntimeJson(
+      config.runtimeDir,
+      path.join(node.id, "latest-invoice.json")
     );
     if (latestInvoice?.invoice_address) {
       presets.push({
@@ -421,8 +809,9 @@ async function getLivePresets(config) {
       });
     }
 
-    const tooBigInvoice = await tryReadJson(
-      path.join(config.runtimeDir, node.id, "too-big-invoice.json")
+    const tooBigInvoice = await tryReadRuntimeJson(
+      config.runtimeDir,
+      path.join(node.id, "too-big-invoice.json")
     );
     if (tooBigInvoice?.invoice_address) {
       presets.push({
@@ -582,7 +971,7 @@ function resolveConfiguredNodeSet({
   }));
 }
 
-function buildEnvironmentFacts({ overrides, nodeSet, usingBundledLab }) {
+export function buildEnvironmentFacts({ overrides, nodeSet, usingBundledLab }) {
   const knownPayments = compactObject({
     success:
       overrides.successfulPaymentHash ||
@@ -634,6 +1023,52 @@ function parseJsonValue(value) {
   }
 }
 
+function extractNodeChannels(node) {
+  const rawChannels =
+    node?.context?.channels?.channels ||
+    node?.context?.channels?.items ||
+    node?.context?.channels ||
+    [];
+
+  if (!Array.isArray(rawChannels)) {
+    return [];
+  }
+
+  return rawChannels.map((channel, index) => ({
+    id:
+      channel.channel_id ||
+      channel.channelId ||
+      channel.id ||
+      `${node.id}-channel-${index + 1}`,
+    state:
+      channel.state?.state_name ||
+      channel.state?.stateName ||
+      channel.state ||
+      channel.status ||
+      "unknown",
+    capacity: channel.capacity || channel.total_capacity || null,
+    localBalance:
+      channel.local_balance ||
+      channel.localBalance ||
+      channel.to_local_amount ||
+      channel.balance ||
+      null,
+    remoteBalance:
+      channel.remote_balance ||
+      channel.remoteBalance ||
+      channel.to_remote_amount ||
+      null,
+    peerPubkey:
+      channel.peer_pubkey ||
+      channel.peerPubkey ||
+      channel.remote_pubkey ||
+      channel.remotePubkey ||
+      null,
+    routeReadiness: node.summary?.paymentReadiness || null,
+    failure: node.error?.message || null
+  }));
+}
+
 function parseBooleanEnv(value) {
   if (typeof value !== "string") {
     return undefined;
@@ -668,11 +1103,37 @@ async function tryReadJson(filePath) {
   }
 }
 
-async function sendStatic(requestPath, response, publicDir) {
-  const normalizedPath = requestPath === "/" ? "/index.html" : requestPath;
-  const filePath = path.normalize(path.join(publicDir, normalizedPath));
+async function tryReadRuntimeJson(runtimeDir, relativePath) {
+  const filePath = resolveContainedPath(runtimeDir, relativePath);
+  if (!filePath) {
+    return null;
+  }
 
-  if (!filePath.startsWith(publicDir)) {
+  return tryReadJson(filePath);
+}
+
+async function sendStatic(
+  requestPath,
+  response,
+  publicDir,
+  rawRequestUrl = requestPath
+) {
+  const rawPath = String(rawRequestUrl || requestPath).split("?")[0] || requestPath;
+  if (rawPath.includes("..")) {
+    sendJson(
+      response,
+      403,
+      errorEnvelope("FORBIDDEN", "Forbidden.", null, {
+        route: requestPath
+      })
+    );
+    return;
+  }
+
+  const normalizedPath = requestPath === "/" ? "/index.html" : requestPath;
+  const filePath = resolveContainedPath(publicDir, normalizedPath);
+
+  if (!filePath) {
     sendJson(
       response,
       403,
@@ -714,7 +1175,8 @@ async function sendStatic(requestPath, response, publicDir) {
       return;
     }
 
-    const fallback = await readFile(path.join(publicDir, "index.html"));
+    const fallbackPath = resolveContainedPath(publicDir, "/index.html");
+    const fallback = await readFile(fallbackPath);
     response.writeHead(200, {
       "content-type": "text/html; charset=utf-8"
     });
@@ -726,7 +1188,7 @@ function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8"
   });
-  response.end(JSON.stringify(payload));
+  response.end(JSON.stringify(redactForLogs(payload)));
 }
 
 function successEnvelope(data, meta = {}) {
@@ -819,4 +1281,37 @@ function getContentType(filePath) {
 function looksLikeAssetPath(requestPath) {
   const basename = path.basename(requestPath || "");
   return basename.includes(".");
+}
+
+function safeRouteFromRequest(request) {
+  try {
+    return new URL(request.url || "/", "http://fiberops.local").pathname || "/";
+  } catch {
+    return "/";
+  }
+}
+
+function resolveContainedPath(rootDir, candidatePath) {
+  const resolvedRoot = path.resolve(rootDir);
+  const resolvedCandidate = path.resolve(resolvedRoot, `.${candidatePath || ""}`);
+  const relativePath = path.relative(resolvedRoot, resolvedCandidate);
+
+  if (
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    return null;
+  }
+
+  return resolvedCandidate;
+}
+
+function isHistoryBackendInstance(value) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    typeof value.append === "function" &&
+    typeof value.listRecent === "function" &&
+    typeof value.findRelated === "function"
+  );
 }

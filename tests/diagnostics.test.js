@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 
 import {
   buildDiagnosis,
@@ -13,6 +13,7 @@ import {
 } from "../src/lib/diagnostics.js";
 import { buildEventEnvelope } from "../src/lib/diagnostics/events.js";
 import { summarizeContext } from "../src/lib/diagnostics/summaries.js";
+import { HistoryStore } from "../src/lib/history-store.js";
 
 test("classifies failed route construction", () => {
   const diagnosis = buildDiagnosis({
@@ -419,6 +420,7 @@ test("route preview uses rpc probe success when available", () => {
   });
 
   assert.equal(preview.mode, "dry_run");
+  assert.equal(preview.evidenceMode, "keysend_dry_run");
   assert.equal(preview.status, "ready");
   assert.equal(preview.confidence, "high");
   assert.equal(preview.evidenceSource, "send_payment(dry_run)");
@@ -456,6 +458,7 @@ test("route preview uses rpc probe failure when available", () => {
   });
 
   assert.equal(preview.mode, "dry_run");
+  assert.equal(preview.evidenceMode, "keysend_dry_run");
   assert.equal(preview.status, "blocked");
   assert.equal(preview.confidence, "high");
   assert.match(preview.blockingReason, /insufficient balance/i);
@@ -530,6 +533,7 @@ test("route preview surfaces build_router candidates when dry run is unavailable
   });
 
   assert.equal(preview.mode, "route_build");
+  assert.equal(preview.evidenceMode, "build_router");
   assert.equal(preview.status, "ready");
   assert.equal(preview.routeBuildMethod, "build_router");
   assert.equal(preview.routeAlternatives.length, 2);
@@ -557,22 +561,72 @@ test("heuristic preview declares limitations without dry-run evidence", () => {
   });
 
   assert.equal(preview.mode, "heuristic");
+  assert.equal(preview.evidenceMode, "heuristic");
   assert.equal(preview.evidenceSource, "heuristic inference");
   assert.ok(preview.limitations.some((item) => /heuristic/i.test(item)));
 });
 
-test("bootstrap exposes multi-node and persistence capabilities", () => {
-  const bootstrap = getBootstrapData("http://127.0.0.1:8227", {
+test("route preview marks invoice-based dry runs explicitly", () => {
+  const preview = buildRoutePreview({
+    request: {
+      invoice: "lnfib1invoice-demo"
+    },
+    context: {
+      parsedInvoice: {
+        amount: "10000000000",
+        data: {
+          attrs: [
+            {
+              payee_public_key:
+                "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
+            }
+          ]
+        }
+      },
+      routeProbe: {
+        supported: true,
+        evidenceMode: "invoice_dry_run",
+        result: {
+          payment_hash: "0xinvoiceprobe"
+        }
+      }
+    },
+    diagnosis: {
+      category: "needs_more_context"
+    },
+    summary: {}
+  });
+
+  assert.equal(preview.mode, "dry_run");
+  assert.equal(preview.evidenceMode, "invoice_dry_run");
+  assert.equal(preview.status, "ready");
+});
+
+test("bootstrap exposes multi-node, compatibility, and persistence metadata", async () => {
+  const bootstrap = await getBootstrapData("http://127.0.0.1:8227", {
     historyPath: "/tmp/fiberops-history.json",
     nodeSet: [
       { name: "node1", endpoint: "http://127.0.0.1:8227", primary: true },
       { name: "node2", endpoint: "http://127.0.0.1:8237" }
-    ]
+    ],
+    observability: {
+      enabled: true,
+      snapshot() {
+        return {
+          requests: { recent: { requests: 1, errors: 0 } },
+          runs: { started: 1, completed: 1 }
+        };
+      }
+    }
   });
 
   assert.equal(bootstrap.capabilities.multiNodeLive, true);
   assert.equal(bootstrap.capabilities.routeProbe, true);
   assert.equal(bootstrap.capabilities.persistence, true);
+  assert.equal(bootstrap.capabilities.observability, true);
+  assert.equal(bootstrap.contracts.compatibility.current, "2026-07-12");
+  assert.equal(bootstrap.runtime.persistence.enabled, true);
+  assert.equal(bootstrap.runtime.observability.enabled, true);
   assert.equal(bootstrap.nodeSet.length, 2);
 });
 
@@ -802,12 +856,14 @@ test("live diagnosis aggregates both nodes and persists history", async () => {
       {
         mode: "live",
         amount: "10000000000",
+        analysisDepth: "deep",
         targetPubkey:
           "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
       },
       {
         defaultEndpoint: "http://node1.test",
         historyPath,
+        analysisDepth: "deep",
         nodeSet: [
           {
             id: "node1",
@@ -833,6 +889,310 @@ test("live diagnosis aggregates both nodes and persists history", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("live diagnosis uses invoice dry runs instead of keysend when an invoice is provided", async () => {
+  const originalFetch = globalThis.fetch;
+  const rpcCalls = [];
+
+  globalThis.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    rpcCalls.push(payload);
+
+    if (payload.method === "node_info") {
+      return jsonRpcResponse({
+        version: "0.9.0-rc5",
+        pubkey:
+          "02942f9602e5afe0287879b829306d35804c8a2d28ace1d8248b553f580850d696"
+      });
+    }
+
+    if (payload.method === "list_channels") {
+      return jsonRpcResponse({
+        channels: [
+          {
+            state: { state_name: "ChannelReady" },
+            local_balance: "30100000000",
+            channel_id: "0xnode1"
+          }
+        ]
+      });
+    }
+
+    if (payload.method === "parse_invoice") {
+      return jsonRpcResponse({
+        amount: "0x2540be400",
+        data: {
+          attrs: [
+            {
+              payee_public_key:
+                "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
+            }
+          ]
+        }
+      });
+    }
+
+    if (payload.method === "graph_nodes") {
+      return jsonRpcResponse({
+        nodes: [
+          {
+            pubkey:
+              "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
+          }
+        ]
+      });
+    }
+
+    if (payload.method === "send_payment") {
+      return jsonRpcResponse({
+        payment_hash: "0xinvoiceprobe",
+        status: "Created"
+      });
+    }
+
+    throw new Error(`Unexpected method ${payload.method}`);
+  };
+
+  try {
+    const result = await runDiagnosis(
+      {
+        mode: "live",
+        endpoint: "http://node1.test",
+        invoice: "lnfib1invoice-demo"
+      },
+      {
+        defaultEndpoint: "http://node1.test"
+      }
+    );
+
+    const probeCall = rpcCalls.find((call) => call.method === "send_payment");
+    assert.equal(probeCall.params[0].invoice, "lnfib1invoice-demo");
+    assert.equal("keysend" in probeCall.params[0], false);
+    assert.equal(result.routePreview.evidenceMode, "invoice_dry_run");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("standard live analysis skips graph channel and build_router reads", async () => {
+  const originalFetch = globalThis.fetch;
+  const methods = [];
+
+  globalThis.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    methods.push(payload.method);
+
+    if (payload.method === "node_info") {
+      return jsonRpcResponse({
+        version: "0.9.0-rc5",
+        pubkey:
+          "02942f9602e5afe0287879b829306d35804c8a2d28ace1d8248b553f580850d696"
+      });
+    }
+    if (payload.method === "list_channels") {
+      return jsonRpcResponse({
+        channels: [
+          {
+            state: { state_name: "ChannelReady" },
+            local_balance: "30100000000",
+            channel_id: "0xnode1"
+          }
+        ]
+      });
+    }
+    if (payload.method === "graph_nodes") {
+      return jsonRpcResponse({
+        nodes: [
+          {
+            pubkey:
+              "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
+          }
+        ]
+      });
+    }
+    if (payload.method === "send_payment") {
+      return jsonRpcResponse({
+        payment_hash: "0xprobe",
+        status: "Created"
+      });
+    }
+
+    throw new Error(`Unexpected method ${payload.method}`);
+  };
+
+  try {
+    await runDiagnosis(
+      {
+        mode: "live",
+        endpoint: "http://node1.test",
+        amount: "10000000000",
+        targetPubkey:
+          "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
+      },
+      {
+        defaultEndpoint: "http://node1.test",
+        analysisDepth: "standard"
+      }
+    );
+
+    assert.equal(methods.includes("graph_channels"), false);
+    assert.equal(methods.includes("build_router"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("deep live analysis enables graph channel and build_router reads", async () => {
+  const originalFetch = globalThis.fetch;
+  const methods = [];
+
+  globalThis.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+    methods.push(payload.method);
+
+    if (payload.method === "node_info") {
+      return jsonRpcResponse({
+        version: "0.9.0-rc5",
+        pubkey:
+          "02942f9602e5afe0287879b829306d35804c8a2d28ace1d8248b553f580850d696"
+      });
+    }
+    if (payload.method === "list_channels") {
+      return jsonRpcResponse({
+        channels: [
+          {
+            state: { state_name: "ChannelReady" },
+            local_balance: "30100000000",
+            channel_id: "0xnode1"
+          }
+        ]
+      });
+    }
+    if (payload.method === "graph_nodes") {
+      return jsonRpcResponse({
+        nodes: [
+          {
+            pubkey:
+              "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
+          }
+        ]
+      });
+    }
+    if (payload.method === "graph_channels") {
+      return jsonRpcResponse({
+        channels: []
+      });
+    }
+    if (payload.method === "build_router") {
+      return jsonRpcResponse({
+        router_hops: [
+          {
+            target:
+              "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea",
+            amount_received: "10000000010",
+            incoming_tlc_expiry: 42
+          }
+        ]
+      });
+    }
+    if (payload.method === "send_payment") {
+      return jsonRpcResponse({
+        payment_hash: "0xprobe",
+        status: "Created"
+      });
+    }
+
+    throw new Error(`Unexpected method ${payload.method}`);
+  };
+
+  try {
+    await runDiagnosis(
+      {
+        mode: "live",
+        endpoint: "http://node1.test",
+        amount: "10000000000",
+        targetPubkey:
+          "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea",
+        analysisDepth: "deep"
+      },
+      {
+        defaultEndpoint: "http://node1.test",
+        analysisDepth: "deep"
+      }
+    );
+
+    assert.equal(methods.includes("graph_channels"), true);
+    assert.equal(methods.includes("build_router"), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("ndjson history backend appends records without rewriting the legacy json array shape", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "fiberops-history-"));
+  const historyPath = path.join(directory, "diagnostic-history.ndjson");
+  const store = new HistoryStore({
+    filePath: historyPath,
+    backendKind: "ndjson-file",
+    maxRecords: 5
+  });
+
+  await store.append({
+    event: { id: "evt-1", timestamp: "2026-07-13T00:00:00.000Z" },
+    request: { amount: "100" },
+    summary: { targetPubkey: "0xabc" }
+  });
+  await store.append({
+    event: { id: "evt-2", timestamp: "2026-07-13T00:01:00.000Z" },
+    request: { amount: "200" },
+    summary: { targetPubkey: "0xabc" }
+  });
+
+  const recent = await store.listRecent(5);
+  const raw = await readFile(historyPath, "utf8");
+
+  assert.equal(recent.length, 2);
+  assert.equal(recent[0].event.id, "evt-2");
+  assert.equal(raw.trim().startsWith("["), false);
+  assert.equal(raw.trim().split("\n").length, 2);
+});
+
+test("history backend degradation does not break diagnosis output", async () => {
+  const result = await runDiagnosis(
+    {
+      mode: "demo",
+      scenarioId: "route-build-failure"
+    },
+    {
+      historyBackend: {
+        type: "degraded-test",
+        async append() {
+          throw Object.assign(new Error("history append failed"), {
+            code: "HISTORY_APPEND_FAILED"
+          });
+        },
+        async listRecent() {
+          return [];
+        },
+        async findRelated() {
+          return [];
+        }
+      },
+      runContext: {
+        observability: {
+          recordRunStart() {},
+          recordRunComplete() {},
+          recordDiagnosisOutcome() {},
+          recordHistoryPersistence() {}
+        }
+      }
+    }
+  );
+
+  assert.equal(result.source, "demo");
+  assert.equal(result.diagnosis.category, "route_unavailable");
+  assert.equal(result.history, undefined);
 });
 
 test("history comparison enriches follow-up live runs", async () => {
@@ -1055,3 +1415,13 @@ test("history comparison enriches follow-up live runs", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+function jsonRpcResponse(result) {
+  return {
+    ok: true,
+    status: 200,
+    async text() {
+      return JSON.stringify({ result });
+    }
+  };
+}

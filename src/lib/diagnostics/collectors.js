@@ -4,6 +4,7 @@ import {
   PROBE_METHOD_LABEL,
   ROUTE_BUILD_METHOD_LABEL,
   buildMultiNodeSummary,
+  deriveRouteProbePlan,
   deriveRouteProbeInput,
   extractGraphChannels,
   mergePartialErrors,
@@ -15,6 +16,7 @@ import {
   selectBestProbe,
   serializeError
 } from "./shared.js";
+import { buildAggregateStatus, selectAggregateNode } from "./per-node.js";
 
 export async function analyzeLiveNode(
   request,
@@ -59,9 +61,11 @@ export async function analyzeLiveNode(
     await captureClientCall(context, "graphNodes", () =>
       client.graphNodes({}, { signal: options.signal })
     );
-    await captureClientCall(context, "graphChannels", () =>
-      client.graphChannels({ limit: 500 }, { signal: options.signal })
-    );
+    if (options.analysisDepth === "deep") {
+      await captureClientCall(context, "graphChannels", () =>
+        client.graphChannels({ limit: 500 }, { signal: options.signal })
+      );
+    }
   }
 
   if (request.paymentHash) {
@@ -75,7 +79,9 @@ export async function analyzeLiveNode(
     nodeConfig.probe !== false &&
     options.routeProbeEnabled !== false
   ) {
-    await captureRouteBuild(context, client, request, options);
+    if (options.analysisDepth === "deep") {
+      await captureRouteBuild(context, client, request, options);
+    }
     await captureRouteProbe(context, client, request, options);
   } else if (!request.paymentHash) {
     context.routeProbe = normalizeRouteProbe(
@@ -137,8 +143,15 @@ export function buildNodeResult(
       nodeConfig.label ||
       nodeConfig.id ||
       nodeConfig.endpoint,
+    id: nodeConfig.id || nodeConfig.endpoint,
     endpoint: nodeConfig.endpoint,
     primary: Boolean(nodeConfig.primary),
+    requested: Boolean(nodeConfig.requested),
+    selected: Boolean(nodeConfig.selected),
+    probeEnabled: nodeConfig.probe !== false,
+    tokenSource:
+      nodeConfig.tokenSource || (nodeConfig.token ? "node_config" : "none"),
+    policyValidated: nodeConfig.policyValidated === true,
     error: context.error || null,
     partialErrors: context.partialErrors || {},
     summary,
@@ -149,35 +162,39 @@ export function buildNodeResult(
 }
 
 export function aggregateNodeResults(nodes, request, options) {
-  const primaryNode = nodes.find((node) => node.primary) || nodes[0] || null;
-  const bestProbe = selectBestProbe(nodes.map((node) => node.probe));
-  const bestRouteBuild = selectBestRouteBuild(
-    nodes.map((node) => node.routeBuild || node.context?.routeBuild)
-  );
+  const selectedNode = selectAggregateNode(nodes, {
+    selectedNodeId: options.executionPlan?.selectedNodeId || null
+  });
   const aggregatePartialErrors = mergePartialErrors(nodes);
   const aggregateMultiNode = buildMultiNodeSummary(nodes);
   const requestEndpoint =
-    primaryNode?.endpoint || options.defaultEndpoint || null;
+    selectedNode?.endpoint || options.defaultEndpoint || null;
+  const aggregateStatus = buildAggregateStatus(nodes);
 
-  if (!primaryNode) {
+  if (!selectedNode) {
     return {
       requestEndpoint,
+      selectedNode: null,
+      aggregateStatus,
       context: {
         endpoint: requestEndpoint,
         partialErrors: {},
         multiNode: aggregateMultiNode,
-        routeProbe: bestProbe,
-        routeBuild: bestRouteBuild
+        routeProbe: selectBestProbe(nodes.map((node) => node.probe)),
+        routeBuild: selectBestRouteBuild(
+          nodes.map((node) => node.routeBuild || node.context?.routeBuild)
+        )
       }
     };
   }
 
   const context = {
-    ...primaryNode.context,
+    ...selectedNode.context,
     endpoint: requestEndpoint,
     partialErrors: aggregatePartialErrors,
-    routeProbe: bestProbe,
-    routeBuild: bestRouteBuild,
+    routeProbe: selectedNode.probe || selectedNode.context?.routeProbe || null,
+    routeBuild:
+      selectedNode.routeBuild || selectedNode.context?.routeBuild || null,
     multiNode: aggregateMultiNode
   };
 
@@ -190,6 +207,8 @@ export function aggregateNodeResults(nodes, request, options) {
 
   return {
     requestEndpoint,
+    selectedNode,
+    aggregateStatus,
     context
   };
 }
@@ -203,14 +222,14 @@ async function captureClientCall(context, key, operation) {
 }
 
 async function captureRouteProbe(context, client, request, options = {}) {
-  const probeInput = deriveRouteProbeInput(request, context.parsedInvoice);
+  const probePlan = deriveRouteProbePlan(request, context.parsedInvoice);
   const nodePubkey =
     context.nodeInfo?.pubkey ||
     context.nodeInfo?.node_id ||
     context.nodeInfo?.nodeId ||
     null;
 
-  if (!probeInput.targetPubkey || !probeInput.amount) {
+  if (!probePlan.request) {
     context.routeProbe = normalizeRouteProbe(
       {
         supported: false,
@@ -220,9 +239,10 @@ async function captureRouteProbe(context, client, request, options = {}) {
         hops: [],
         blockingError: null,
         feeEstimate: null,
-        requestedAmount: probeInput.amount,
+        requestedAmount: probePlan.amount,
         source: PROBE_METHOD_LABEL,
-        reason: "missing_probe_inputs"
+        reason: "missing_probe_inputs",
+        evidenceMode: probePlan.evidenceMode
       },
       request,
       context.parsedInvoice
@@ -232,9 +252,9 @@ async function captureRouteProbe(context, client, request, options = {}) {
 
   if (
     nodePubkey &&
-    probeInput.targetPubkey &&
+    probePlan.targetPubkey &&
     String(nodePubkey).toLowerCase() ===
-      String(probeInput.targetPubkey).toLowerCase()
+      String(probePlan.targetPubkey).toLowerCase()
   ) {
     context.routeProbe = normalizeRouteProbe(
       {
@@ -245,9 +265,10 @@ async function captureRouteProbe(context, client, request, options = {}) {
         hops: [],
         blockingError: null,
         feeEstimate: null,
-        requestedAmount: probeInput.amount,
+        requestedAmount: probePlan.amount,
         source: PROBE_METHOD_LABEL,
-        reason: "self_target_probe_skipped"
+        reason: "self_target_probe_skipped",
+        evidenceMode: probePlan.evidenceMode
       },
       request,
       context.parsedInvoice
@@ -256,14 +277,9 @@ async function captureRouteProbe(context, client, request, options = {}) {
   }
 
   try {
-    const result = await client.probeRoute(
-      {
-        targetPubkey: probeInput.targetPubkey,
-        amount: probeInput.amount,
-        keysend: true
-      },
-      { signal: options.signal }
-    );
+    const result = await client.probeRoute(probePlan.request, {
+      signal: options.signal
+    });
     context.routeBuildSupport = true;
     context.routeProbe = normalizeRouteProbe(
       {
@@ -272,12 +288,8 @@ async function captureRouteProbe(context, client, request, options = {}) {
         mode: "rpc",
         method: "send_payment",
         dryRun: true,
-        request: {
-          target_pubkey: probeInput.targetPubkey,
-          amount: probeInput.amount,
-          keysend: true,
-          dry_run: true
-        },
+        request: normalizeProbeRpcRequest(probePlan),
+        evidenceMode: probePlan.evidenceMode,
         result
       },
       request,
@@ -292,18 +304,34 @@ async function captureRouteProbe(context, client, request, options = {}) {
         mode: "rpc",
         method: "send_payment",
         dryRun: true,
-        request: {
-          target_pubkey: probeInput.targetPubkey,
-          amount: probeInput.amount,
-          keysend: true,
-          dry_run: true
-        },
+        request: normalizeProbeRpcRequest(probePlan),
+        evidenceMode: probePlan.evidenceMode,
         error: serializeError(error)
       },
       request,
       context.parsedInvoice
     );
   }
+}
+
+function normalizeProbeRpcRequest(probePlan) {
+  if (!probePlan?.request) {
+    return {};
+  }
+
+  if (probePlan.strategy === "invoice") {
+    return {
+      invoice: probePlan.request.invoice,
+      dry_run: true
+    };
+  }
+
+  return {
+    target_pubkey: probePlan.request.targetPubkey,
+    amount: probePlan.request.amount,
+    keysend: probePlan.request.keysend === true,
+    dry_run: true
+  };
 }
 
 async function captureRouteBuild(context, client, request, options = {}) {

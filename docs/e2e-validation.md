@@ -1,9 +1,16 @@
 # End-to-end validation
 
+## Related docs
+
+- [Developer guide](./developer-guide.md)
+- [Local lab runbook](./local-lab-runbook.md)
+- [Contracts](./contracts.md)
+- [Release process](./release-process.md)
+
 ## Local setup
 
 ```bash
-npm install
+npm ci
 npm run lab:reset
 npm run lab:prepare
 npm run lab:check
@@ -37,6 +44,7 @@ Verify that:
 
 - bootstrap returns capabilities, environment metadata, and contract endpoints
 - contract endpoints return published schemas/rules
+- live diagnose returns execution metadata for the resolved node set
 - non-2xx responses return structured error envelopes
 
 ## Browser smoke
@@ -48,8 +56,12 @@ npm run test:browser
 Current smoke coverage includes:
 
 - guided happy path
+- Lab workspace rendering from environment facts
+- live manual workflow with explicit `analysisDepth=deep`
 - bootstrap failure rendering
 - diagnose failure rendering for non-2xx responses
+
+On some restricted macOS sandboxes, Playwright may be unable to start a browser process at all. In that case the smoke script reports a skip instead of a false application failure.
 
 ## Guided judge demo
 

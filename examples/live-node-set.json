@@ -1,0 +1,16 @@
+[
+  {
+    "id": "node1",
+    "name": "node1",
+    "endpoint": "http://127.0.0.1:8227",
+    "primary": true,
+    "probe": true
+  },
+  {
+    "id": "node2",
+    "name": "node2",
+    "endpoint": "http://127.0.0.1:8237",
+    "primary": false,
+    "probe": true
+  }
+]

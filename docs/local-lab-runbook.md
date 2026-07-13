@@ -1,9 +1,16 @@
 # Local lab runbook
 
+## Related docs
+
+- [Developer guide](./developer-guide.md)
+- [Runtime model](./runtime-model.md)
+- [End-to-end validation](./e2e-validation.md)
+- [Release process](./release-process.md)
+
 ## Canonical bootstrap flow
 
 ```bash
-npm install
+npm ci
 npm run lab:reset
 npm run lab:prepare
 npm run lab:check

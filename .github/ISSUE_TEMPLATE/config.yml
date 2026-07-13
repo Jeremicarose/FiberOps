@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: FiberOps README
+    url: https://github.com/Jeremicarose/FiberOps/blob/main/README.md
+    about: Start with the project overview, setup instructions, and demo flow.
+  - name: Developer Guide
+    url: https://github.com/Jeremicarose/FiberOps/blob/main/docs/developer-guide.md
+    about: Review architecture, API contracts, and runtime behavior before filing deep technical issues.

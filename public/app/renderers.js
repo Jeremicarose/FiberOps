@@ -42,10 +42,10 @@ export function updateBootstrapState(state, dom, nextState, error = null) {
     dom.bootstrapMessage.dataset.bootstrapState = nextState;
     dom.bootstrapMessage.textContent =
       nextState === "ready"
-        ? "Dashboard configuration, contract endpoints, and local-lab metadata loaded successfully."
+        ? "Dashboard configuration, contract endpoints, and environment metadata loaded successfully."
         : nextState === "failed"
           ? `Bootstrap degraded: ${error?.message || "The app could not load /api/bootstrap."}`
-          : "Loading dashboard configuration and local lab metadata.";
+          : "Loading dashboard configuration and environment metadata.";
   }
 }
 
@@ -481,6 +481,7 @@ export function renderRoutePreview(dom, routePreview, submittedPayload) {
   const confidence =
     routePreview.confidence ||
     (mode === "dry_run" ? "high" : mode === "heuristic" ? "medium" : "low");
+  const evidenceMode = routePreview.evidenceMode || mode;
   const routeAlternatives = Array.isArray(routePreview.routeAlternatives)
     ? routePreview.routeAlternatives
     : [];
@@ -596,6 +597,10 @@ export function renderRoutePreview(dom, routePreview, submittedPayload) {
         <article>
           <span>Preview basis</span>
           <strong>${escapeHtml(humanize(mode))}</strong>
+        </article>
+        <article>
+          <span>Evidence mode</span>
+          <strong>${escapeHtml(humanize(evidenceMode))}</strong>
         </article>
         <article>
           <span>Evidence source</span>

@@ -1,5 +1,13 @@
 # Failure modes
 
+## Related docs
+
+- [Developer guide](./developer-guide.md)
+- [Runtime model](./runtime-model.md)
+- [Contracts](./contracts.md)
+- [Local lab runbook](./local-lab-runbook.md)
+- [End-to-end validation](./e2e-validation.md)
+
 | Category                 | Typical evidence                                                         | Meaning                                                  | Operator action                                                |
 | ------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------- | -------------------------------------------------------------- |
 | `rpc_unavailable`        | transport error, endpoint unreachable                                    | Fiber RPC could not be contacted                         | Verify node process, endpoint, and network reachability        |

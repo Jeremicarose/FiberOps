@@ -1,4 +1,4 @@
-import { humanizeToken } from "./shared.js";
+import { buildStableId, humanizeToken } from "./shared.js";
 
 export function buildAlerts({
   request,
@@ -93,10 +93,3 @@ function dedupeAlerts(alerts) {
   });
 }
 
-function buildStableId(value) {
-  let hash = 0;
-  for (const character of String(value)) {
-    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  }
-  return `evt_${hash.toString(16).padStart(8, "0")}`;
-}

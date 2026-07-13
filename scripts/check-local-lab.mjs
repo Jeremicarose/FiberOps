@@ -1,40 +1,19 @@
 import { access, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.join(__dirname, "..");
+import {
+  getLocalLabPaths,
+  getRequiredLabArtifacts
+} from "./local-lab-topology.mjs";
 
-const archivePath =
-  process.env.FIBEROPS_FNN_ARCHIVE ||
-  path.join(rootDir, "fnn_v0.9.0-rc5-x86_64-darwin-portable.tar.gz");
-const runtimeDir =
-  process.env.FIBEROPS_RUNTIME_DIR || path.join(rootDir, "runtime");
-const vendorDir =
-  process.env.FIBEROPS_VENDOR_DIR || path.join(rootDir, "vendor", "fnn");
-
-const requiredPaths = [
-  archivePath,
-  path.join(vendorDir, "fnn"),
-  path.join(vendorDir, "fnn-cli"),
-  path.join(runtimeDir, "manifest.json"),
-  path.join(runtimeDir, "node1", "fnn"),
-  path.join(runtimeDir, "node1", "fnn-cli"),
-  path.join(runtimeDir, "node1", "config.yml"),
-  path.join(runtimeDir, "node2", "fnn"),
-  path.join(runtimeDir, "node2", "fnn-cli"),
-  path.join(runtimeDir, "node2", "config.yml")
-];
+const { archivePath, vendorDir, manifestPath } = getLocalLabPaths();
+const requiredPaths = getRequiredLabArtifacts();
 
 for (const filePath of requiredPaths) {
   await ensureReadable(filePath);
 }
 
-const manifest = JSON.parse(
-  await readFile(path.join(runtimeDir, "manifest.json"), "utf8")
-);
+const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 validateManifest(manifest);
 
 const rpcChecks = await Promise.all((manifest.nodes || []).map(checkRpcHealth));
@@ -46,7 +25,7 @@ process.stdout.write(
   `${formatStatus("ok", `Vendor runtime present at ${vendorDir}`)}\n`
 );
 process.stdout.write(
-  `${formatStatus("ok", `Manifest loaded from ${path.join(runtimeDir, "manifest.json")}`)}\n`
+  `${formatStatus("ok", `Manifest loaded from ${manifestPath}`)}\n`
 );
 
 for (const rpcCheck of rpcChecks) {
