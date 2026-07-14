@@ -90,7 +90,12 @@ export function renderPanelHead({ eyebrow, title, detail = "", actions = "" }) {
   `;
 }
 
-export function renderEmptyState(title, message, actionMarkup = "", options = {}) {
+export function renderEmptyState(
+  title,
+  message,
+  actionMarkup = "",
+  options = {}
+) {
   const compactClass = options.compact ? " empty-state-panel--compact" : "";
 
   return `

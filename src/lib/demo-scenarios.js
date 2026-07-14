@@ -2,6 +2,43 @@ const now = Math.floor(Date.now() / 1000);
 
 export const demoScenarios = [
   {
+    id: "healthy-payment",
+    name: "Healthy payment",
+    description:
+      "A known-good payment settled successfully and can be used as a baseline for later failures.",
+    request: {
+      paymentHash:
+        "0x729f0879b24702a9226ebb35bbcbbbdcca0eb859addc62da1f121dc1c20df209",
+      amount: "150000000",
+      targetPubkey:
+        "03deb7d87a4858475863be6c77a284509dbd5ffdadf0cd9340dba5c4b41913aeea"
+    },
+    context: {
+      nodeInfo: {
+        version: "v0.9.0-rc5",
+        peers_count: "0x5",
+        channel_count: "0x3"
+      },
+      channels: [
+        {
+          channel_id: "0xgood1",
+          state: "Open",
+          local_balance: "450000000",
+          remote_balance: "210000000"
+        },
+        {
+          channel_id: "0xgood2",
+          state: "Open",
+          local_balance: "280000000",
+          remote_balance: "170000000"
+        }
+      ],
+      payment: {
+        status: "Success"
+      }
+    }
+  },
+  {
     id: "route-build-failure",
     name: "Route unavailable",
     description:

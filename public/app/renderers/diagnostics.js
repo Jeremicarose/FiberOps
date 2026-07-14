@@ -143,7 +143,7 @@ export function renderDiagnostics(dom, model) {
           })}
           ${
             model.metrics.length
-              ? `<div class="metrics-grid metrics-grid--four">${renderMetricCards(model.metrics)}</div>`
+              ? `<div class="metrics-grid metrics-grid--diagnostics-summary">${renderMetricCards(model.metrics)}</div>`
               : renderEmptyState(
                   "No result yet",
                   "Run a request to populate the investigation summary."

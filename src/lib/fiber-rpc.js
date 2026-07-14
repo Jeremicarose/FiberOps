@@ -200,6 +200,33 @@ export class FiberRpcClient {
 
     return this.call("send_payment", params, options);
   }
+
+  async sendPaymentWithRouter(
+    {
+      router,
+      paymentHash,
+      invoice,
+      keysend,
+      dryRun,
+      customRecords,
+      udtTypeScript
+    } = {},
+    options
+  ) {
+    return this.call(
+      "send_payment_with_router",
+      pruneUndefined({
+        router,
+        payment_hash: paymentHash,
+        invoice,
+        keysend,
+        dry_run: dryRun,
+        custom_records: customRecords,
+        udt_type_script: udtTypeScript
+      }),
+      options
+    );
+  }
 }
 
 export function isUnauthorizedError(error) {

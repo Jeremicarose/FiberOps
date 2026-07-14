@@ -80,6 +80,34 @@ export const DOCK_TABS = [
   { id: "notifications", label: "Notifications" }
 ];
 
+export const DEMO_SCENARIO_PRESETS = [
+  {
+    id: "healthy-payment",
+    label: "Healthy Payment",
+    detail: "Known-good baseline"
+  },
+  {
+    id: "preflight-liquidity-block",
+    label: "Low Liquidity",
+    detail: "Outbound liquidity too low"
+  },
+  {
+    id: "rpc-unavailable",
+    label: "Offline Node",
+    detail: "RPC unavailable"
+  },
+  {
+    id: "fee-too-high",
+    label: "Fee Budget Too Low",
+    detail: "Route exists, fee budget fails"
+  },
+  {
+    id: "route-build-failure",
+    label: "Route Not Found",
+    detail: "No viable route"
+  }
+];
+
 export const BOOTSTRAP_FALLBACK = {
   scenarios: [],
   liveStory: [],

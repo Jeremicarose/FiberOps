@@ -57,12 +57,7 @@ const MAX_NOTIFICATION_ITEMS = 24;
 const MAX_TOASTS = 3;
 const TOAST_DURATION_MS = 2600;
 const VIEWPORT_WIDE_QUERY = "(min-width: 1180px)";
-const DOCK_VISIBLE_WORKSPACES = new Set([
-  "diagnostics",
-  "routing",
-  "activity",
-  "logs"
-]);
+const DOCK_VISIBLE_WORKSPACES = new Set();
 const WORKSPACE_SHORTCUTS = {
   1: "overview",
   2: "nodes",
@@ -255,6 +250,12 @@ function onWorkspaceClick(event) {
   const reportExportTrigger = event.target.closest("[data-report-export]");
   if (reportExportTrigger) {
     exportReport(reportExportTrigger.dataset.reportExport);
+    return;
+  }
+
+  const demoScenarioTrigger = event.target.closest("[data-demo-scenario]");
+  if (demoScenarioTrigger) {
+    runDemoScenario(demoScenarioTrigger.dataset.demoScenario);
     return;
   }
 
@@ -609,6 +610,46 @@ function applyPreset(preset) {
   render();
 }
 
+function runDemoScenario(scenarioId) {
+  const scenario = (state.bootstrap?.scenarios || []).find(
+    (item) => item.id === scenarioId
+  );
+  if (!scenario) {
+    pushNotification({
+      kind: "warning",
+      title: "Scenario unavailable",
+      message:
+        "This demo scenario is not present in the current bootstrap payload.",
+      source: "demo-scenario"
+    });
+    return;
+  }
+
+  state.mode = "demo";
+  state.activeWorkspace = "diagnostics";
+  state.activePreset = {
+    id: scenario.id,
+    title: scenario.name,
+    description: scenario.description
+  };
+  state.diagnosticsDraft = {
+    ...state.diagnosticsDraft,
+    scenarioId: scenario.id,
+    endpoint: "",
+    token: "",
+    invoice: "",
+    paymentHash: "",
+    amount: "",
+    targetPubkey: ""
+  };
+  state.ui.lastActivityLabel = `Running scenario ${scenario.name}`;
+  persistUiState();
+  void runCurrentDiagnostics({
+    successLabel: scenario.name,
+    source: "demo-scenario"
+  });
+}
+
 async function refreshWorkspaceData() {
   const requests = await Promise.allSettled([
     requestApi("/api/runtime/status"),
@@ -750,6 +791,21 @@ function persistRoutingDraft(formData) {
 
 async function submitDiagnostics(form) {
   persistDiagnosticsDraft(new FormData(form));
+  await runCurrentDiagnostics({
+    successLabel:
+      state.mode === "demo"
+        ? state.activePreset?.title ||
+          state.diagnosticsDraft.scenarioId ||
+          "demo diagnosis"
+        : "live diagnosis",
+    source: "diagnostics"
+  });
+}
+
+async function runCurrentDiagnostics({
+  successLabel = "diagnostics",
+  source = "diagnostics"
+} = {}) {
   const payload = buildDiagnosticsPayload();
   const requestId = beginActiveRequest();
   state.ui.loading = true;
@@ -807,7 +863,7 @@ async function submitDiagnostics(form) {
       serverRelated.recent || state.activitySnapshot.server || []
     );
     state.ui.lastActivityLabel =
-      result.diagnosis?.headline || "Completed diagnostics run";
+      result.diagnosis?.headline || `Completed ${successLabel}`;
     openInspectorForCurrentWorkspace();
     pushNotification({
       kind: toneToNotificationKind(
@@ -817,8 +873,8 @@ async function submitDiagnostics(form) {
       message:
         result.diagnosis?.headline ||
         result.summary?.paymentReadiness ||
-        "Completed diagnostics run",
-      source: "diagnostics"
+        `Completed ${successLabel}`,
+      source
     });
   } catch (error) {
     if (!isActiveRequest(requestId) || error?.aborted) {
@@ -829,7 +885,7 @@ async function submitDiagnostics(form) {
       kind: "error",
       title: "Diagnostics request failed",
       message: error?.message || "Unable to complete diagnosis.",
-      source: "diagnostics"
+      source
     });
   } finally {
     finishActiveRequest(requestId);

@@ -1,4 +1,4 @@
-  :root {
+:root {
   color-scheme: light;
   --bg: #f3efe8;
   --bg-alt: #ebe4da;
@@ -300,8 +300,10 @@ strong {
 .signal-card__meta span,
 .timeline-item__meta span,
 .status-pill {
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    var(--shadow-sm);
 }
 
 .rail-context-card {
@@ -400,14 +402,17 @@ html[data-theme="dark"] .state-chip {
 
 .rail-nav__item {
   position: relative;
-  padding: 10px 12px;
+  padding: 11px 13px;
   border-radius: 14px;
   display: flex;
   align-items: center;
-  border: 1px solid transparent;
-  background: transparent;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.32);
   text-align: left;
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 6px 16px rgba(31, 19, 10, 0.05);
   cursor: pointer;
   transition:
     background-color var(--ease),
@@ -444,16 +449,29 @@ html[data-theme="dark"] .state-chip {
   transform: translateY(-1px);
 }
 
+.topbar-nav__item:hover,
+.topbar-nav__item:focus-visible {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: var(--ink);
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 24px rgba(31, 19, 10, 0.08);
+}
+
 .rail-nav__item.is-active {
   background: linear-gradient(
     90deg,
-    rgba(31, 139, 130, 0.14),
-    rgba(31, 139, 130, 0.04)
+    rgba(31, 139, 130, 0.18),
+    rgba(31, 139, 130, 0.08)
   );
-  border-color: rgba(31, 139, 130, 0.18);
+  border-color: rgba(31, 139, 130, 0.28);
   box-shadow:
     inset 2px 0 0 var(--accent),
-    0 10px 24px rgba(31, 139, 130, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 24px rgba(31, 139, 130, 0.1);
 }
 
 .app-frame {
@@ -546,15 +564,17 @@ html[data-theme="dark"] .mode-toggle {
 }
 
 .topbar-nav__item {
-  min-height: 42px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.42);
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.58);
   color: var(--ink-soft);
   font: 650 14px/1 var(--font-ui);
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 8px 18px rgba(31, 19, 10, 0.06);
   transition:
     background-color var(--ease),
     color var(--ease),
@@ -572,14 +592,33 @@ html[data-theme="dark"] .mode-toggle {
 }
 
 .topbar-nav__item.is-active {
-  background: linear-gradient(180deg, rgba(31, 139, 130, 0.2), rgba(31, 139, 130, 0.08));
-  border-color: rgba(31, 139, 130, 0.24);
+  background: linear-gradient(
+    180deg,
+    rgba(31, 139, 130, 0.24),
+    rgba(31, 139, 130, 0.1)
+  );
+  border-color: rgba(31, 139, 130, 0.34);
   color: var(--ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 10px 24px rgba(31, 139, 130, 0.1);
+}
+
+html[data-theme="dark"] .rail-nav__item {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 html[data-theme="dark"] .topbar-nav__item {
-  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--ink-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 22px rgba(0, 0, 0, 0.18);
 }
 
 html[data-theme="dark"] .topbar-nav__item:hover,
@@ -866,7 +905,11 @@ html[data-theme="dark"] .topbar-nav__item:focus-visible {
 }
 
 .workspace-grid--diagnostics {
-  grid-template-columns: minmax(320px, 0.95fr) minmax(320px, 1.05fr) minmax(300px, 0.88fr);
+  align-items: start;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.2fr) minmax(
+      340px,
+      1fr
+    );
 }
 
 .workspace-stack {
@@ -885,6 +928,7 @@ html[data-theme="dark"] .topbar-nav__item:focus-visible {
 .panel-surface {
   min-width: 0;
   padding: 15px;
+  border-width: 2px;
   border-radius: 22px;
   background: var(--surface);
   backdrop-filter: blur(20px) saturate(130%);
@@ -922,6 +966,11 @@ html[data-theme="dark"] .topbar-nav__item:focus-visible {
   gap: 12px;
 }
 
+.metrics-grid--diagnostics-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
 .mini-card {
   padding: 15px;
   border-radius: 18px;
@@ -957,7 +1006,15 @@ html[data-theme="dark"] .inspector-drawer__surface,
 html[data-theme="dark"] .notification-tray__surface,
 html[data-theme="dark"] .command-palette__surface,
 html[data-theme="dark"] .dock-panel {
-  background: linear-gradient(180deg, rgba(24, 34, 47, 0.92), rgba(14, 21, 30, 0.92));
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    var(--shadow-sm);
+  background: linear-gradient(
+    180deg,
+    rgba(24, 34, 47, 0.92),
+    rgba(14, 21, 30, 0.92)
+  );
 }
 
 html[data-theme="dark"] .rail-nav__item:hover,
@@ -1005,7 +1062,11 @@ html[data-theme="dark"] .action-list__item,
 html[data-theme="dark"] .timeline-item,
 html[data-theme="dark"] .signal-card__meta span,
 html[data-theme="dark"] .timeline-item__meta span {
-  background: linear-gradient(180deg, rgba(27, 39, 54, 0.92), rgba(16, 24, 35, 0.9));
+  background: linear-gradient(
+    180deg,
+    rgba(27, 39, 54, 0.92),
+    rgba(16, 24, 35, 0.9)
+  );
 }
 
 .signal-card__top,
@@ -1128,6 +1189,60 @@ html[data-theme="dark"] .timeline-item__meta span {
   margin: 8px 0 6px;
   font-size: 16px;
   font-weight: 620;
+}
+
+.story-flow {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+}
+
+.scenario-button-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.scenario-button {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.74);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--ease),
+    border-color var(--ease);
+}
+
+html[data-theme="dark"] .scenario-button {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scenario-button:hover,
+.scenario-button:focus-visible {
+  background: rgba(255, 255, 255, 0.96);
+  outline: none;
+}
+
+html[data-theme="dark"] .scenario-button:hover,
+html[data-theme="dark"] .scenario-button:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.scenario-button strong {
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.scenario-button span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .action-list__item {
@@ -1452,11 +1567,12 @@ html[data-theme="dark"] .runtime-group {
 
 .diagnostics-column {
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  align-content: start;
 }
 
 .diagnostics-section {
-  padding: 12px 13px;
+  padding: 14px 15px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.28);
@@ -1467,7 +1583,25 @@ html[data-theme="dark"] .diagnostics-section {
 }
 
 .diagnostics-section h4 {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.metrics-grid--diagnostics-summary .metric-card {
+  min-height: 168px;
+  padding: 14px;
+}
+
+.metrics-grid--diagnostics-summary .metric-card strong {
+  font-size: clamp(28px, 2.2vw, 38px);
+  line-height: 0.96;
+}
+
+.metrics-grid--diagnostics-summary .metric-card p {
+  max-width: 24ch;
+}
+
+.metrics-grid--diagnostics-summary .metric-card span {
+  letter-spacing: 0.14em;
 }
 
 .empty-state-panel,
@@ -1759,6 +1893,14 @@ html[data-theme="dark"] .empty-state-inline {
     grid-template-columns: 1fr;
   }
 
+  .workspace-grid--diagnostics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metrics-grid--diagnostics-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .data-table-wrap,
   .data-table-wrap--compact {
     max-height: min(52vh, 420px);
@@ -1809,6 +1951,10 @@ html[data-theme="dark"] .empty-state-inline {
   .workspace-shell__canvas {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .metrics-grid--diagnostics-summary {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .data-table-wrap,

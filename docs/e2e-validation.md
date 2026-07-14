@@ -65,10 +65,18 @@ On some restricted macOS sandboxes, Playwright may be unable to start a browser 
 
 ## Guided judge demo
 
-1. Load the app.
-2. Use the guided story cards in the UI.
-3. Show preflight block, failure explanation, and success baseline.
-4. Confirm results and route preview are visible in the Results workspace.
+Do not walk through every page in sequence.
+
+Use the story-first demo order from [Judge demo narrative](./judge-demo.md):
+
+1. Healthy payment baseline
+2. Low-liquidity failure
+3. Offline-node failure
+4. Route-not-found or fee-budget failure
+5. Replay recent investigation
+6. Live-mode proof against real Fiber nodes or the bundled lab
+
+Use the `Simulations` workspace buttons for the replay scenarios so the demo remains deterministic under presentation conditions. The app now exposes these directly as one-click buttons instead of requiring manual form entry first.
 
 ## Optional live-lab validation
 

@@ -427,9 +427,8 @@ async function attemptBuildRouterCandidate(
   options = {}
 ) {
   const hopsInfoVariants = [
-    pathPubkeys.map((pubkey) => [pubkey, null]),
     pathPubkeys.map((pubkey) => ({ pubkey })),
-    pathPubkeys
+    pathPubkeys.map((pubkey) => [pubkey, null])
   ];
   let lastInvalidEncodingError = null;
 

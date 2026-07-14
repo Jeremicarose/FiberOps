@@ -1,6 +1,6 @@
-# FiberOps | Fiber on CKB Operator Console
+# FiberOps | Fiber Desktop on CKB Operator Console
 
-FiberOps is a read-only diagnostics console for Fiber on CKB that turns raw node state into an operator-friendly explanation of what failed, what evidence is real, and what to do next.
+FiberOps is the diagnostics engine and repository behind **Fiber Desktop**, a read-only operator console for Fiber on CKB. It turns raw node state into an operator-friendly explanation of what failed, what evidence is real, and what to do next.
 
 ## Problem
 
@@ -30,7 +30,18 @@ It is designed to answer a small set of operational questions clearly:
 - Do multiple live nodes agree on the result?
 - What should the operator do next?
 
-FiberOps is not a wallet and not a payment sender UI. It is an operator console for understanding Fiber routing behavior safely.
+Fiber Desktop is not a wallet and not a payment sender UI. It is operator software for understanding Fiber routing behavior safely.
+
+The current desktop shell is organized around a small set of primary workspaces:
+
+- **Overview** for health, changes, and next actions
+- **Nodes** for sender posture and live node comparison
+- **Payments** for history, retries, and failure clusters
+- **Routes** for candidate path analysis
+- **Diagnostics** for deep failure explanation
+- **Settings** for observation defaults and runtime safety
+
+Supporting flows such as **Simulations**, **Activity replay**, **Logs**, and **Reports** are still available, but they are treated as contextual investigation tools rather than the first thing a judge or operator has to navigate.
 
 Key architectural properties:
 
@@ -52,6 +63,10 @@ Key architectural properties:
 ### Degraded RPC failure state
 
 ![FiberOps degraded RPC failure state](docs/screenshots/degraded-rpc-failure.png)
+
+### Multi-node comparison
+
+![FiberOps multi-node comparison](docs/screenshots/multi-node-comparison.png)
 
 ## Quick start
 
@@ -81,11 +96,26 @@ For local configuration templates, see `.env.example` and `examples/live-node-se
 
 Use the browser app to:
 
-- run demo scenarios
+- open the current network overview first
+- jump directly into node, payment, route, or diagnostics workflows
+- run one-click demo scenarios from `Simulations`
 - inspect live node readiness
 - compare multi-node perspectives
 - review route preview evidence
-- inspect backend history when enabled
+- replay backend history when enabled
+- switch between auto, light, and dark themes during review
+
+### Demo scenarios
+
+The current `Simulations` workspace includes one-click scenario buttons for reliable demos:
+
+- `Healthy Payment`
+- `Low Liquidity`
+- `Offline Node`
+- `Fee Budget Too Low`
+- `Route Not Found`
+
+These are intended for presentations and judging. They remove the risk of trying to recreate a failure live while an audience is watching.
 
 ### HTTP API
 
@@ -153,6 +183,7 @@ Start here:
 - [Failure modes](docs/failure-modes.md) — diagnosis taxonomy and operator actions
 - [Local lab runbook](docs/local-lab-runbook.md) — prepare and operate the bundled lab
 - [End-to-end validation](docs/e2e-validation.md) — validation paths for UI, API, and live lab workflows
+- [Judge demo narrative](docs/judge-demo.md) — story-first presentation flow for demos and judging
 - [Release process](docs/release-process.md) — release checklist and tagging flow
 
 Suggested reading paths:
@@ -161,6 +192,7 @@ Suggested reading paths:
 - **Integrating the API:** README -> Developer guide -> Contracts -> Runtime model
 - **Running the local lab:** README -> Local lab runbook -> End-to-end validation
 - **Debugging a failure:** README -> Failure modes -> Runtime model -> Contracts
+- **Presenting to judges:** README -> Judge demo narrative -> End-to-end validation
 
 ## Contributing
 

@@ -786,7 +786,12 @@ function extractRouteBuildHops(result) {
         "incomingTlcExpiry",
         "cltv_expiry"
       ]),
-      channelId: pickFirst(hop, ["channel_id", "channelId", "prev_channel_id"]),
+      channelId: pickFirst(hop, [
+        "channel_outpoint",
+        "channel_id",
+        "channelId",
+        "prev_channel_id"
+      ]),
       fee: pickFirst(hop, ["fee", "forwarding_fee", "forwardingFee"]) || null
     };
   });

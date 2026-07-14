@@ -10,6 +10,8 @@
 
 FiberOps is structured as a thin UI plus HTTP shell around a reusable diagnostics package.
 
+At the product layer, the current browser shell presents that engine as `Fiber Desktop`: a workflow-oriented operator client with a compact primary navigation set and contextual investigation surfaces.
+
 ## Component diagram
 
 ```mermaid
@@ -82,6 +84,18 @@ sequenceDiagram
 - `src/lib/diagnostics/contracts.js` — request/result/export schema publication, compatibility metadata, and validation
 - `src/lib/observability.js` — request IDs, structured logs, counters, and duration aggregates
 - `src/lib/history-backend.js` — backend normalization around append/listRecent/findRelated/getStatus
+
+## Desktop shell
+
+The current browser UI is no longer documented best as "many equal workspaces". The primary desktop flow is:
+
+1. **Overview** for posture and change detection
+2. **Nodes** or **Payments** to pick the affected sender or payment
+3. **Routes** or **Diagnostics** to explain the failure deeply
+4. **Simulations** to replay deterministic scenarios
+5. **Activity / Reports / Logs** as supporting evidence when needed
+
+This distinction matters for demos and onboarding: the shell is optimized around investigation and explanation, not around browsing every page in sequence.
 
 ## Notes
 
