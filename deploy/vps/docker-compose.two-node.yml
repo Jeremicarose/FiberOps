@@ -1,20 +1,17 @@
 services:
   fiberops:
     environment:
-      FIBER_RPC_URL_NODE2: http://fiber-node-2:8237
+      FIBER_RPC_URL_NODE2: http://127.0.0.1:8237
       FIBEROPS_NODE_SET_JSON: >-
-        [{"id":"node1","name":"node1","endpoint":"http://fiber-node:8227","primary":true,"probe":true},{"id":"node2","name":"node2","endpoint":"http://fiber-node-2:8237","primary":false,"probe":true}]
+        [{"id":"node1","name":"node1","endpoint":"http://127.0.0.1:8227","primary":true,"probe":true},{"id":"node2","name":"node2","endpoint":"http://127.0.0.1:8237","primary":false,"probe":true}]
       FIBEROPS_ENVIRONMENT_NAME: VPS judging two-node Fiber lab
 
   fiber-node-2:
     image: ${FIBER_NODE_IMAGE:-nervos/fiber:v0.9.0-rc5}
     restart: unless-stopped
+    network_mode: host
     environment:
       FIBER_SECRET_KEY_PASSWORD: ${FIBER_NODE2_SECRET_KEY_PASSWORD:?set FIBER_NODE2_SECRET_KEY_PASSWORD}
     command: ["sh", "-lc", "exec fnn -c /fiber/config.yml -d /fiber"]
-    expose:
-      - "8237"
-    ports:
-      - "${FIBER_NODE2_P2P_PUBLIC_PORT:-8238}:8238"
     volumes:
       - ./state/node2:/fiber

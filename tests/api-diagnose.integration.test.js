@@ -315,22 +315,22 @@ test("api diagnose blocks non-loopback live endpoints by default", async () => {
 test("api diagnose validates the resolved execution node set, not only the requested endpoint", async () => {
   const fixture = await createServerFixture({
     nodeSet: [
-        {
-          id: "node1",
-          name: "node1",
-          endpoint: "http://127.0.0.1:8227",
-          primary: true,
-          trusted: false
-        },
-        {
-          id: "node2",
-          name: "node2",
-          endpoint: "http://example.com:8227",
-          primary: false,
-          trusted: false
-        }
-      ]
-    });
+      {
+        id: "node1",
+        name: "node1",
+        endpoint: "http://127.0.0.1:8227",
+        primary: true,
+        trusted: false
+      },
+      {
+        id: "node2",
+        name: "node2",
+        endpoint: "http://example.com:8227",
+        primary: false,
+        trusted: false
+      }
+    ]
+  });
   const response = await fixture.request({
     method: "POST",
     url: "/api/diagnose",

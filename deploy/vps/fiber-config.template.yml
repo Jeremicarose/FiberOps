@@ -78,8 +78,8 @@ fiber:
             dep_type: code
 
 rpc:
-  # FiberOps connects to this port over the private Docker network.
-  # Do not publish it to the public VPS interface.
+  # FiberOps connects to this port over host networking on the VPS.
+  # Keep it on loopback so RPC stays private to the machine.
   listening_addr: "__FIBER_RPC_BIND_HOST__:__FIBER_RPC_PORT__"
 
 ckb:

@@ -1,6 +1,6 @@
 # FiberOps Developer Guide
 
-FiberOps is the diagnostics engine and repository behind Fiber Desktop, a read-only operator console for Fiber on CKB. It gives operators, integrators, and contributors a consistent way to inspect routing readiness, payment failures, and multi-node behavior without sending live payments.
+FiberOps is the diagnostics engine and repository behind the current FiberOps operator console, a read-only diagnostics surface for Fiber on CKB. It gives operators, integrators, and contributors a consistent way to inspect routing readiness, payment failures, and multi-node behavior without sending live payments.
 
 ## Related docs
 
@@ -50,7 +50,7 @@ The key architectural principle is consistency: the browser UI, API, CLI, and li
 
 ### Browser UI
 
-The browser UI is the operator-facing desktop shell. It is optimized for guided demos, interactive troubleshooting, and side-by-side comparison of live-node perspectives.
+The browser UI is the operator-facing FiberOps shell. It is optimized for guided demos, interactive troubleshooting, and side-by-side comparison of live-node perspectives.
 
 The current shell emphasizes a small core navigation set:
 
@@ -59,11 +59,13 @@ The current shell emphasizes a small core navigation set:
 - `Payments`
 - `Routes`
 - `Diagnostics`
+- `Logs`
+- `Reports`
 - `Settings`
 
-Supporting investigation tools such as `Simulations`, `Activity`, `Logs`, and `Reports` are still part of the product, but they are treated as supporting flows rather than the main navigation spine.
+Supporting investigation tools such as `Simulations` and replay/history flows are still part of the product, but they are treated as supporting flows rather than the main navigation spine.
 
-From a documentation standpoint, this matters because the UI is no longer best explained as "a dashboard with many equal tabs". It is a workflow-oriented desktop client:
+From a documentation standpoint, this matters because the UI is no longer best explained as "a dashboard with many equal tabs". It is a workflow-oriented operator client:
 
 1. understand what changed
 2. identify the affected sender or payment
@@ -185,7 +187,7 @@ The project ships local templates in `.env.example` and `examples/live-node-set.
 
 From a product perspective, the most important configuration idea is policy: FiberOps defaults toward safe local usage and requires explicit opt-in for riskier live-network behaviors.
 
-The desktop shell also supports `Auto`, `Light`, and `Dark` theme modes. These are UI-only preferences and do not change diagnostics behavior.
+The shell also supports `Auto`, `Light`, and `Dark` theme modes. These are UI-only preferences and do not change diagnostics behavior.
 
 ## Node management
 
@@ -238,7 +240,7 @@ npm run dev
 
 From there, validation can continue through browser smoke tests, API checks, full repository checks, or optional live-lab tests. The authoritative validation paths are documented in [End-to-end validation](./e2e-validation.md).
 
-For presentations, the desktop now includes deterministic one-click demo scenarios in `Simulations`:
+For presentations, FiberOps now includes deterministic one-click demo scenarios in `Simulations`:
 
 - Healthy Payment
 - Low Liquidity

@@ -16,7 +16,7 @@ FiberOps exists to close that gap.
 
 FiberOps provides a single diagnostics engine through four surfaces:
 
-- **FiberOps** for demos and operator workflows
+- **Browser UI** for demos and operator workflows
 - **HTTP API** for backend integration
 - **CLI** for scripted diagnostics
 - **Library exports** for embedding in other tools
@@ -32,18 +32,18 @@ It is designed to answer a small set of operational questions clearly:
 
 FiberOps is not a wallet and not a payment sender UI. It is operator software for understanding Fiber routing behavior safely.
 
-The current desktop shell is organized around a small set of primary workspaces:
+The current FiberOps shell is organized around a compact core navigation set:
 
 - **Overview** for health, changes, and next actions
 - **Nodes** for sender posture and live node comparison
-- **Channels** for channel state and readiness details
-- **Routing** for candidate path analysis
+- **Payments** for history, retries, and failure clusters
+- **Routes** for candidate path analysis
 - **Diagnostics** for deep failure explanation
-- **Activity** for history and replay
-- **Testing** for guided proof flows, presets, and local lab workflows
-- **Configuration** for observation defaults and runtime safety
+- **Logs** for recent events and trace
+- **Reports** for exportable summaries
+- **Settings** for observation defaults and runtime safety
 
-The interface is workflow-oriented rather than tab-heavy. Supporting investigation tools such as scenario presets, replay history, and lab validation are part of a single operator story instead of separate disconnected demos.
+The interface is workflow-oriented rather than tab-heavy. Supporting investigation tools such as **Simulations**, replay history, and lab validation are launched from quick actions, command palette entries, or guided demo flows instead of competing with the primary navigation all the time.
 
 Key architectural properties:
 
@@ -52,31 +52,49 @@ Key architectural properties:
 - route evidence is explicit: heuristic, invoice dry run, keysend-style dry run, or opt-in deep route-build analysis
 - history persistence is behind a backend seam with a compatible JSON backend and an append-safe NDJSON backend
 
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    UI[FiberOps Browser UI] --> API[HTTP API / server-app]
+    CLI[CLI] --> DIAG[Diagnostics Engine]
+    LIB[Library Consumers] --> DIAG
+    API --> DIAG
+    DIAG --> PLAN[Execution Plan + Request Policy]
+    DIAG --> RPC[Fiber JSON-RPC Nodes]
+    DIAG --> HIST[History Backend]
+    API --> OBS[Observability + Metrics]
+```
+
+Operationally, FiberOps validates a request, resolves the exact node set that will be contacted, gathers Fiber evidence, computes per-node diagnosis first, then assembles a selected-node-anchored result with summaries, route previews, alerts, and optional history comparison.
+
 ## Screenshots
 
-### Workspace shell and overview flow
+The screenshots below reflect the current FiberOps shell and show the main operator workflows as they exist in the app today.
 
-The current FiberOps shell is organized around dedicated operator workspaces instead of a single generic dashboard.
+### Diagnostics workspace: healthy baseline
 
-![FiberOps workspace shell](docs/screenshots/guided-home.png)
+A successful payment becomes a known-good baseline that operators can compare against later failures.
 
-### Diagnostics workspace
+![FiberOps diagnostics success baseline](docs/screenshots/current-diagnostics-success-baseline.png)
 
-Run diagnosis without leaving context. Inputs, summary, checks, evidence, and references stay visible in the same workspace.
+### Diagnostics workspace: replayed investigation
 
-![FiberOps diagnostics workspace](docs/screenshots/blocked-route-diagnosis.png)
+Replay mode preserves prior failure context so a judge or operator can explain what happened without recreating the incident live.
 
-### Nodes workspace
+![FiberOps diagnostics replay investigation](docs/screenshots/current-diagnostics-replay-investigation.png)
 
-Compare configured senders and peers in one operator view, including readiness, outbound capacity, and route proof posture.
+### Logs workspace
 
-![FiberOps nodes workspace](docs/screenshots/multi-node-comparison.png)
+FiberOps surfaces recent runtime issues, notifications, and partial RPC failures in a dedicated operator view.
 
-### Degraded-state handling
+![FiberOps logs workspace](docs/screenshots/current-logs-workspace.png)
 
-FiberOps preserves operator context when an upstream RPC or backend path is unhealthy instead of collapsing into an unreadable error state.
+### Routes workspace
 
-![FiberOps degraded RPC failure state](docs/screenshots/degraded-rpc-failure.png)
+Route analysis keeps inputs, candidate posture, confidence, and blockers together in one flow.
+
+![FiberOps routes workspace](docs/screenshots/current-routes-workspace.png)
 
 ## Quick start
 
@@ -110,17 +128,19 @@ Use the FiberOps app to:
 
 - open the current network overview first
 - compare configured senders and peers in **Nodes**
-- inspect channel posture in **Channels**
-- review path and proof posture in **Routing**
+- search failure history and healthy baselines in **Payments**
+- review path and proof posture in **Routes**
 - run deep investigation flows in **Diagnostics**
-- replay prior investigations in **Activity**
-- use **Testing** for guided proof flows, live presets, and bundled lab facts
+- inspect recent runtime issues in **Logs**
+- export reusable summaries from **Reports**
+- manage connection and policy defaults in **Settings**
 - switch into **Demo** or **Live** mode depending on whether the workflow should be deterministic or backed by real nodes
 - switch between auto, light, and dark themes during review
+- launch **Simulations** from guided demo buttons and quick actions when you want deterministic replay scenarios
 
 ### Guided proof and demo presets
 
-The `Testing` workspace includes guided proof cards and one-click presets for reliable demos and validation:
+The `Simulations` workspace includes guided proof cards and one-click presets for reliable demos and validation:
 
 - `Healthy Payment`
 - `Low Liquidity`

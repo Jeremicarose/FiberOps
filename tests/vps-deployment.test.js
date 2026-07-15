@@ -15,13 +15,13 @@ const repoRoot = path.join(__dirname, "..");
 test("prepare-vps-stack renders a one-node private-rpc config", async () => {
   const outputDir = await mkdtemp(path.join(os.tmpdir(), "fiberops-vps-"));
 
-  await execFile("node", [
-    "scripts/prepare-vps-stack.mjs",
-    "--output-dir",
-    outputDir
-  ], {
-    cwd: repoRoot
-  });
+  await execFile(
+    "node",
+    ["scripts/prepare-vps-stack.mjs", "--output-dir", outputDir],
+    {
+      cwd: repoRoot
+    }
+  );
 
   const config = await readFile(
     path.join(outputDir, "node1", "config.yml"),
@@ -29,20 +29,19 @@ test("prepare-vps-stack renders a one-node private-rpc config", async () => {
   );
 
   assert.match(config, /listening_addr: "\/ip4\/0\.0\.0\.0\/tcp\/8228"/);
-  assert.match(config, /listening_addr: "0\.0\.0\.0:8227"/);
+  assert.match(config, /listening_addr: "127\.0\.0\.1:8227"/);
 });
 
 test("prepare-vps-stack renders the optional second node", async () => {
   const outputDir = await mkdtemp(path.join(os.tmpdir(), "fiberops-vps-"));
 
-  await execFile("node", [
-    "scripts/prepare-vps-stack.mjs",
-    "--two-node",
-    "--output-dir",
-    outputDir
-  ], {
-    cwd: repoRoot
-  });
+  await execFile(
+    "node",
+    ["scripts/prepare-vps-stack.mjs", "--two-node", "--output-dir", outputDir],
+    {
+      cwd: repoRoot
+    }
+  );
 
   const config = await readFile(
     path.join(outputDir, "node2", "config.yml"),
@@ -50,7 +49,7 @@ test("prepare-vps-stack renders the optional second node", async () => {
   );
 
   assert.match(config, /listening_addr: "\/ip4\/0\.0\.0\.0\/tcp\/8238"/);
-  assert.match(config, /listening_addr: "0\.0\.0\.0:8237"/);
+  assert.match(config, /listening_addr: "127\.0\.0\.1:8237"/);
 });
 
 test("compose stack publishes app and p2p ports but not raw rpc", async () => {
@@ -63,11 +62,10 @@ test("compose stack publishes app and p2p ports but not raw rpc", async () => {
     "utf8"
   );
 
-  assert.match(compose, /FIBER_RPC_URL: http:\/\/fiber-node:8227/);
-  assert.match(compose, /\$\{FIBEROPS_PUBLIC_PORT:-3000\}:3000/);
-  assert.match(compose, /\$\{FIBER_NODE1_P2P_PUBLIC_PORT:-8228\}:8228/);
-  assert.doesNotMatch(compose, /8227:8227/);
-  assert.match(override, /FIBER_RPC_URL_NODE2: http:\/\/fiber-node-2:8237/);
-  assert.match(override, /\$\{FIBER_NODE2_P2P_PUBLIC_PORT:-8238\}:8238/);
-  assert.doesNotMatch(override, /8237:8237/);
+  assert.match(compose, /network_mode: host/);
+  assert.match(compose, /FIBER_RPC_URL: http:\/\/127\.0\.0\.1:8227/);
+  assert.doesNotMatch(compose, /ports:/);
+  assert.match(override, /FIBER_RPC_URL_NODE2: http:\/\/127\.0\.0\.1:8237/);
+  assert.match(override, /network_mode: host/);
+  assert.doesNotMatch(override, /ports:/);
 });

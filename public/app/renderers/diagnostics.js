@@ -183,8 +183,11 @@ export function renderDiagnostics(dom, model) {
               ${renderBulletList(
                 model.checks.map((item) => {
                   const label = item.title || item.label || "Check";
-                  const value = item.detail || item.value || item.result || "Unknown";
-                  const status = item.status ? `${item.status.toUpperCase()} · ` : "";
+                  const value =
+                    item.detail || item.value || item.result || "Unknown";
+                  const status = item.status
+                    ? `${item.status.toUpperCase()} · `
+                    : "";
                   return `${status}${label}: ${value}`;
                 })
               )}

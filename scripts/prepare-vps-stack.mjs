@@ -40,9 +40,9 @@ await mkdir(path.join(outputDir, "fiberops"), { recursive: true });
 process.stdout.write(
   [
     `Prepared VPS judging stack state in ${outputDir}`,
-    "- Rendered node1 config with private RPC on 0.0.0.0:8227 for the Docker network.",
+    "- Rendered node1 config with private RPC on 127.0.0.1:8227 for host networking.",
     includeSecondNode
-      ? "- Rendered node2 config with private RPC on 0.0.0.0:8237 for two-node comparison."
+      ? "- Rendered node2 config with private RPC on 127.0.0.1:8237 for two-node comparison."
       : "- Re-run with --two-node to render node2 as well.",
     "- Place Fiber key material under deploy/vps/state/node*/ckb before starting Docker Compose."
   ].join("\n") + "\n"
@@ -53,7 +53,7 @@ async function renderNode({ nodeId, rpcPort, p2pPort, outputDir, template }) {
   await mkdir(path.join(nodeDir, "ckb"), { recursive: true });
 
   const rendered = template
-    .replaceAll("__FIBER_RPC_BIND_HOST__", "0.0.0.0")
+    .replaceAll("__FIBER_RPC_BIND_HOST__", "127.0.0.1")
     .replaceAll("__FIBER_RPC_PORT__", String(rpcPort))
     .replaceAll("__FIBER_P2P_PORT__", String(p2pPort));
 

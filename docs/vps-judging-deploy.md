@@ -4,7 +4,7 @@ FiberOps is easiest to demonstrate to judges as:
 
 - one public **FiberOps** web app
 - one or two real **Fiber nodes**
-- **Fiber RPC kept private** to the VPS or Docker network
+- **Fiber RPC kept private** to the VPS loopback interface
 
 This guide sets up that shape.
 
@@ -17,24 +17,27 @@ This guide sets up that shape.
 
 ## Topology
 
+This deployment uses **host networking** on Linux so Fiber nodes can keep RPC on loopback and FiberOps can still reach them safely.
+
 ### One-node judging stack
 
 - `fiberops`
   - public on port `3000`
+  - runs with host networking
 - `fiber-node`
-  - P2P published on `8228`
-  - RPC listens on `0.0.0.0:8227` **inside Docker only**
-  - RPC is **not published** to the host
+  - P2P listens on host port `8228`
+  - RPC listens on `127.0.0.1:8227`
+  - RPC is private to the VPS
 
 ### Optional two-node stack
 
 - `fiberops`
 - `fiber-node`
   - P2P public port `8228`
-  - private RPC `8227`
+  - private RPC `127.0.0.1:8227`
 - `fiber-node-2`
   - P2P public port `8238`
-  - private RPC `8237`
+  - private RPC `127.0.0.1:8237`
 
 FiberOps receives the two-node set through `FIBEROPS_NODE_SET_JSON` in the override compose file.
 
@@ -92,7 +95,7 @@ Edit `deploy/vps/judging.env`:
 ```bash
 FIBEROPS_PUBLIC_PORT=3000
 FIBEROPS_HISTORY_BACKEND=ndjson-file
-FIBER_NODE_IMAGE=nervos/fiber:v0.9.0-rc5
+FIBER_NODE_IMAGE=nervos/fiber:0.9.0-rc7
 FIBER_NODE1_P2P_PUBLIC_PORT=8228
 FIBER_NODE2_P2P_PUBLIC_PORT=8238
 FIBER_NODE1_SECRET_KEY_PASSWORD=replace-me
@@ -133,7 +136,7 @@ curl http://127.0.0.1:3000/api/health
 Expected:
 
 - `ok: true`
-- default endpoint points at the internal Fiber node service
+- default endpoint points at `http://127.0.0.1:8227`
 
 ### FiberOps bootstrap
 
@@ -154,7 +157,7 @@ From outside the VPS, **do not** expose:
 - `8227`
 - `8237`
 
-Only publish:
+Publicly reachable:
 
 - `3000` for FiberOps
 - `8228` and optional `8238` for Fiber P2P
@@ -171,6 +174,8 @@ Do not allow inbound:
 
 - `8227/tcp`
 - `8237/tcp`
+
+Because host networking is used, enforce these restrictions with the host firewall or provider firewall.
 
 ## Judge demo recommendation
 
