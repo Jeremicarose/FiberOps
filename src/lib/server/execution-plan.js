@@ -32,6 +32,7 @@ export function resolveExecutionPlan({
           timeoutMs: payload.timeoutMs,
           probe: true,
           primary: true,
+          trusted: false,
           requested: Boolean(requestedEndpoint),
           selected: true
         }
@@ -101,6 +102,7 @@ export function resolveExecutionPlan({
         timeoutMs: payload.timeoutMs,
         probe: true,
         primary: true,
+        trusted: false,
         requested: true,
         selected: true
       }
@@ -114,16 +116,18 @@ export function validateExecutionPlan(
   { defaultEndpoint = DEFAULT_ENDPOINT } = {}
 ) {
   const nodes = (executionPlan?.nodes || []).map((node) => {
-    validateLiveEndpointPolicy(
-      {
-        endpoint: node.endpoint,
-        token: node.token || ""
-      },
-      policy,
-      {
-        defaultEndpoint
-      }
-    );
+    if (!node.trusted) {
+      validateLiveEndpointPolicy(
+        {
+          endpoint: node.endpoint,
+          token: node.token || ""
+        },
+        policy,
+        {
+          defaultEndpoint
+        }
+      );
+    }
 
     return {
       ...node,
@@ -171,6 +175,7 @@ function finalizePlan({ scope, selectedNodeId, nodes }) {
       timeoutMs:
         Number(node.timeoutMs) > 0 ? Number(node.timeoutMs) : undefined,
       probe: node.probe !== false,
+      trusted: Boolean(node.trusted),
       primary: Boolean(node.primary),
       requested: Boolean(node.requested),
       selected: Boolean(node.selected)
@@ -185,7 +190,8 @@ function cloneNode(node) {
     endpoint: node.endpoint,
     token: node.token || "",
     timeoutMs: node.timeoutMs,
-    probe: node.probe !== false
+    probe: node.probe !== false,
+    trusted: node.trusted === true
   };
 }
 

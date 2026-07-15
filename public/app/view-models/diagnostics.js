@@ -1,5 +1,16 @@
 import { humanize } from "../utils.js";
 
+const ACTION_SUMMARY_MAX = 56;
+
+function summarizeAction(value) {
+  const text = String(value || "Review evidence").trim();
+  if (text.length <= ACTION_SUMMARY_MAX) {
+    return text;
+  }
+
+  return `${text.slice(0, ACTION_SUMMARY_MAX - 1).trimEnd()}…`;
+}
+
 export function createDiagnosticsViewModel(state) {
   const result = state.lastDiagnosisResult;
   const diagnosis = result?.diagnosis || null;
@@ -100,7 +111,17 @@ export function createDiagnosticsViewModel(state) {
               summary.paymentStatus ||
               "No blocking reason recorded"
           }
-        ]
+        ].map((item) => ({
+          ...item,
+          value:
+            item.label === "Next operator move"
+              ? summarizeAction(item.value)
+              : item.value,
+          detail:
+            item.label === "Next operator move"
+              ? String(item.value || "Review evidence")
+              : item.detail
+        }))
       : [],
     checks: diagnosis?.checks || [],
     evidence: diagnosis?.evidence || [],

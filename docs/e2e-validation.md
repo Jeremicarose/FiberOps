@@ -85,3 +85,13 @@ npm run test:live
 ```
 
 This remains opt-in and requires the local lab plus any required environment variables.
+
+## Hosted judging validation
+
+If you deploy FiberOps to a VPS for judges:
+
+1. follow [VPS judging deployment](./vps-judging-deploy.md)
+2. verify `GET /api/health`
+3. verify `GET /api/bootstrap`
+4. confirm Fiber RPC ports are not published publicly
+5. run the judge story from [Judge demo narrative](./judge-demo.md)

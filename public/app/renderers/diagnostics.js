@@ -12,6 +12,10 @@ import { escapeHtml } from "../utils.js";
 export function renderDiagnostics(dom, model) {
   const draft = dom.state.diagnosticsDraft || {};
   const errorMessage = dom.state.ui.error?.message || "";
+  const hasInvoice = Boolean(draft.invoice);
+  const hasPaymentHash = Boolean(draft.paymentHash);
+  const routeInputsDisabled = hasInvoice || hasPaymentHash;
+  const invoiceDisabled = hasPaymentHash;
 
   dom.workspaceRoot.innerHTML = `
     <section class="workspace-screen workspace-screen--diagnostics">
@@ -54,7 +58,7 @@ export function renderDiagnostics(dom, model) {
             </label>
             <label class="field-group">
               <span>Scenario</span>
-              <select name="scenarioId">
+              <select name="scenarioId" ${dom.state.mode === "live" ? "disabled" : ""}>
                 ${(dom.state.bootstrap?.scenarios || [])
                   .map(
                     (scenario) => `
@@ -86,17 +90,27 @@ export function renderDiagnostics(dom, model) {
             </label>
             <label class="field-group field-group--full">
               <span>Invoice</span>
-              <textarea name="invoice" rows="4" placeholder="Paste a Fiber invoice">${escapeHtml(
-                draft.invoice || ""
-              )}</textarea>
+              <textarea
+                name="invoice"
+                rows="4"
+                placeholder="${hasPaymentHash ? "Cleared when a payment hash is present" : "Paste a Fiber invoice"}"
+                ${invoiceDisabled ? "disabled" : ""}
+              >${escapeHtml(draft.invoice || "")}</textarea>
             </label>
+            ${
+              hasPaymentHash
+                ? `<p class="form-hint">Payment hash takes priority. Invoice, amount, and target pubkey are cleared while it is present.</p>`
+                : hasInvoice
+                  ? `<p class="form-hint">Invoice mode is active. Amount and target pubkey are cleared while the invoice is present.</p>`
+                  : ""
+            }
             <label class="field-group">
               <span>Payment hash</span>
               <input
                 name="paymentHash"
                 type="text"
                 value="${escapeHtml(draft.paymentHash || "")}"
-                placeholder="0x..."
+                placeholder="${dom.state.mode === "live" ? "Leave empty unless you already have a real payment hash" : "0x..."}"
               />
             </label>
             <label class="field-group">
@@ -105,7 +119,8 @@ export function renderDiagnostics(dom, model) {
                 name="amount"
                 type="text"
                 value="${escapeHtml(draft.amount || "")}"
-                placeholder="150000000"
+                placeholder="${routeInputsDisabled ? "Cleared when invoice or payment hash is present" : "150000000"}"
+                ${routeInputsDisabled ? "disabled" : ""}
               />
             </label>
             <label class="field-group">
@@ -114,7 +129,8 @@ export function renderDiagnostics(dom, model) {
                 name="targetPubkey"
                 type="text"
                 value="${escapeHtml(draft.targetPubkey || "")}"
-                placeholder="0x02..."
+                placeholder="${routeInputsDisabled ? "Cleared when invoice or payment hash is present" : "0x02..."}"
+                ${routeInputsDisabled ? "disabled" : ""}
               />
             </label>
             <label class="field-group">
@@ -165,10 +181,12 @@ export function renderDiagnostics(dom, model) {
             <section class="detail-list diagnostics-section diagnostics-section--checks">
               <h4>Checks</h4>
               ${renderBulletList(
-                model.checks.map(
-                  (item) =>
-                    `${item.label || "Check"}: ${item.value || item.result || "Unknown"}`
-                )
+                model.checks.map((item) => {
+                  const label = item.title || item.label || "Check";
+                  const value = item.detail || item.value || item.result || "Unknown";
+                  const status = item.status ? `${item.status.toUpperCase()} · ` : "";
+                  return `${status}${label}: ${value}`;
+                })
               )}
             </section>
             <section class="detail-list diagnostics-section diagnostics-section--evidence">

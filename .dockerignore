@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log*
+.git
+.github
+.env
+.env.local
+.env.*.local
+runtime
+vendor
+test-results
+playwright-report
+coverage
+docs/screenshots
+fnn_*.tar.gz
+*.tmp

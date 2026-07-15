@@ -196,21 +196,36 @@ export function buildDiagnosis({
   );
   addPeerIdFinding(checks, evidence, request.targetPubkey);
 
-  let classification = {
-    headline:
-      "Collect a payment hash or invoice to diagnose a specific failure",
-    category: "needs_more_context",
-    severity: "medium",
-    confidence: 0.55,
-    explanation:
-      "The node is reachable, but there is not enough payment-specific context yet to explain a failure. Provide an invoice, payment hash, or requested amount to tighten the diagnosis.",
-    actions: [
-      "Paste a Fiber invoice to validate expiry, amount, and metadata before retrying.",
-      "Paste a payment hash to inspect final status and failed_error from the node.",
-      "Keep this tool read-only for the demo: analyze existing state instead of sending a payment from the app."
-    ],
-    refs: ["sdk", "rpcOverview"]
-  };
+  let classification = invoiceFindings.hasInvoice
+    ? {
+        headline: "The invoice is valid, but there is no failure evidence yet",
+        category: "invoice_ready_no_failure_context",
+        severity: "low",
+        confidence: 0.74,
+        explanation:
+          "FiberOps successfully parsed the invoice and checked the available node and routing context, but it still does not have a concrete failed payment record to explain. This result is a readiness check, not a failure diagnosis.",
+        actions: [
+          "Use this as a preflight check: the invoice parsed correctly and the current context looks suitable for an attempt.",
+          "If a real payment fails, paste the resulting payment hash to inspect final status and failed_error from the node.",
+          "Keep this tool read-only for the demo: analyze existing state instead of sending a payment from the app."
+        ],
+        refs: ["sdk", "rpcOverview"]
+      }
+    : {
+        headline:
+          "Collect a payment hash or invoice to diagnose a specific failure",
+        category: "needs_more_context",
+        severity: "medium",
+        confidence: 0.55,
+        explanation:
+          "The node is reachable, but there is not enough payment-specific context yet to explain a failure. Provide an invoice, payment hash, or requested amount to tighten the diagnosis.",
+        actions: [
+          "Paste a Fiber invoice to validate expiry, amount, and metadata before retrying.",
+          "Paste a payment hash to inspect final status and failed_error from the node.",
+          "Keep this tool read-only for the demo: analyze existing state instead of sending a payment from the app."
+        ],
+        refs: ["sdk", "rpcOverview"]
+      };
 
   if (
     !paymentStatus &&
@@ -376,9 +391,9 @@ export function buildDiagnosis({
       explanation:
         "Fiber reports the payment as successful, so no failure diagnosis is necessary for this payment hash.",
       actions: [
-        "Record the successful route and fee data for future comparisons.",
-        "If you are investigating intermittent issues, compare this payment against recent failures with the same target and amount.",
-        "Use this as a known-good baseline in your demo or test suite."
+        "This payment worked. Save this result as a known-good baseline.",
+        "If a later payment to the same target and amount fails, compare it against this successful run.",
+        "Use this successful route as a reference point in your demo, test suite, or incident review."
       ],
       refs: ["paymentLifecycle", "sdk"]
     };

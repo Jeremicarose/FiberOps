@@ -1507,6 +1507,14 @@ html[data-theme="dark"] .runtime-group {
   grid-column: 1 / -1;
 }
 
+.form-hint {
+  grid-column: 1 / -1;
+  margin: -2px 0 4px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .field-group input,
 .field-group textarea,
 .field-group select,
@@ -1551,6 +1559,16 @@ html[data-theme="dark"] .runtime-group {
 .reference-list {
   margin: 0;
   padding-left: 18px;
+}
+
+.bullet-list li,
+.reference-list li,
+.kv-row dd,
+.table-cell__primary,
+.table-cell__meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .candidate-card__facts {

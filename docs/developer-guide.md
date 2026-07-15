@@ -10,6 +10,7 @@ FiberOps is the diagnostics engine and repository behind Fiber Desktop, a read-o
 - [Runtime model](./runtime-model.md)
 - [Failure modes](./failure-modes.md)
 - [Local lab runbook](./local-lab-runbook.md)
+- [VPS judging deployment](./vps-judging-deploy.md)
 - [End-to-end validation](./e2e-validation.md)
 
 ## Overview
@@ -195,6 +196,8 @@ A deployment can diagnose through a single configured node or compare multiple l
 This matters because route readiness is sender-specific. A payment path can appear healthy from one node and blocked from another. FiberOps is designed to surface that disagreement rather than collapsing it into a single network-wide guess.
 
 For local development and demos, the bundled lab provides a repeatable two-node environment. See the [Local lab runbook](./local-lab-runbook.md) for the operational flow.
+
+For a hosted judging setup, use the VPS deployment flow documented in [VPS judging deployment](./vps-judging-deploy.md). That path keeps Fiber RPC private while exposing FiberOps publicly.
 
 ## Diagnostics model
 

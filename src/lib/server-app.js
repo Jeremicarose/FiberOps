@@ -729,6 +729,7 @@ export function getConfiguredNodeSet(config = createFiberOpsConfig()) {
     ...(node.pubkey ? { pubkey: node.pubkey } : {}),
     ...(node.token ? { token: node.token } : {}),
     ...(node.timeoutMs ? { timeoutMs: node.timeoutMs } : {}),
+    trusted: node.trusted !== false,
     primary: node.primary ?? index === 0,
     probe: node.probe !== false
   }));
@@ -966,6 +967,7 @@ function resolveConfiguredNodeSet({
     ...(Number(node.timeoutMs) > 0
       ? { timeoutMs: Number(node.timeoutMs) }
       : {}),
+    trusted: node.trusted !== false,
     primary: node.primary ?? index === 0,
     probe: node.probe !== false
   }));

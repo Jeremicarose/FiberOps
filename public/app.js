@@ -384,6 +384,7 @@ function onWorkspaceChange(event) {
       setMode(modeSelect.value);
     }
     persistDiagnosticsDraft(new FormData(form));
+    clearDiagnosticsResult();
     render();
     return;
   }
@@ -549,7 +550,38 @@ function seedDraftsFromBootstrap() {
 }
 
 function setMode(mode) {
-  state.mode = mode === "live" ? "live" : "demo";
+  const nextMode = mode === "live" ? "live" : "demo";
+  const previousMode = state.mode;
+  state.mode = nextMode;
+
+  if (previousMode !== nextMode) {
+    clearDiagnosticsResult();
+    if (nextMode === "live") {
+      state.activePreset = null;
+      state.diagnosticsDraft = {
+        ...state.diagnosticsDraft,
+        scenarioId: state.bootstrap?.scenarios?.[0]?.id || "",
+        invoice: "",
+        paymentHash: "",
+        amount: "",
+        targetPubkey: ""
+      };
+    } else {
+      state.diagnosticsDraft = {
+        ...state.diagnosticsDraft,
+        endpoint:
+          state.diagnosticsDraft.endpoint ||
+          state.bootstrap?.defaultEndpoint ||
+          BOOTSTRAP_FALLBACK.defaultEndpoint,
+        token: "",
+        invoice: "",
+        paymentHash: "",
+        amount: "",
+        targetPubkey: ""
+      };
+    }
+  }
+
   persistUiState();
   render();
 }
@@ -611,6 +643,7 @@ function applyPreset(preset) {
 }
 
 function runDemoScenario(scenarioId) {
+  clearDiagnosticsResult();
   const scenario = (state.bootstrap?.scenarios || []).find(
     (item) => item.id === scenarioId
   );
@@ -767,14 +800,32 @@ function syncActivitySnapshot(serverRecent = null) {
 }
 
 function persistDiagnosticsDraft(formData) {
+  const nextMode = String(formData.get("mode-select") || state.mode);
+  let invoice = String(formData.get("invoice") || "").trim();
+  const paymentHash = String(formData.get("paymentHash") || "").trim();
+  let amount = String(formData.get("amount") || "").trim();
+  let targetPubkey = String(formData.get("targetPubkey") || "").trim();
+
+  if (paymentHash) {
+    invoice = "";
+    amount = "";
+    targetPubkey = "";
+  } else if (invoice) {
+    amount = "";
+    targetPubkey = "";
+  }
+
   state.diagnosticsDraft = {
-    scenarioId: String(formData.get("scenarioId") || ""),
+    scenarioId:
+      nextMode === "demo"
+        ? String(formData.get("scenarioId") || "")
+        : state.bootstrap?.scenarios?.[0]?.id || "",
     endpoint: String(formData.get("endpoint") || ""),
     token: String(formData.get("token") || ""),
-    invoice: String(formData.get("invoice") || ""),
-    paymentHash: String(formData.get("paymentHash") || ""),
-    amount: String(formData.get("amount") || ""),
-    targetPubkey: String(formData.get("targetPubkey") || ""),
+    invoice,
+    paymentHash,
+    amount,
+    targetPubkey,
     analysisDepth: String(formData.get("analysisDepth") || "standard")
   };
   persistUiState();
@@ -787,6 +838,12 @@ function persistRoutingDraft(formData) {
     invoice: String(formData.get("invoice") || "")
   };
   persistUiState();
+}
+
+function clearDiagnosticsResult() {
+  state.lastDiagnosisResult = null;
+  state.lastExecutionPlan = null;
+  state.ui.error = null;
 }
 
 async function submitDiagnostics(form) {

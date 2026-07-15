@@ -1,0 +1,47 @@
+services:
+  fiberops:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      FIBER_RPC_URL: http://fiber-node:8227
+      FIBEROPS_HISTORY_PATH: /var/lib/fiberops/diagnostic-history.ndjson
+      FIBEROPS_HISTORY_BACKEND: ${FIBEROPS_HISTORY_BACKEND:-ndjson-file}
+      FIBEROPS_ROUTE_PROBE_ENABLED: "true"
+      FIBEROPS_ALLOW_EXTERNAL_LIVE_ENDPOINTS: "false"
+      FIBEROPS_ALLOW_INSECURE_TOKEN_FORWARDING: "false"
+      FIBEROPS_ENVIRONMENT_NAME: VPS judging node
+    depends_on:
+      - fiber-node
+    ports:
+      - "${FIBEROPS_PUBLIC_PORT:-3000}:3000"
+    volumes:
+      - ./state/fiberops:/var/lib/fiberops
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  fiber-node:
+    image: ${FIBER_NODE_IMAGE:-nervos/fiber:v0.9.0-rc5}
+    restart: unless-stopped
+    environment:
+      FIBER_SECRET_KEY_PASSWORD: ${FIBER_NODE1_SECRET_KEY_PASSWORD:?set FIBER_NODE1_SECRET_KEY_PASSWORD}
+    command: ["sh", "-lc", "exec fnn -c /fiber/config.yml -d /fiber"]
+    expose:
+      - "8227"
+    ports:
+      - "${FIBER_NODE1_P2P_PUBLIC_PORT:-8228}:8228"
+    volumes:
+      - ./state/node1:/fiber

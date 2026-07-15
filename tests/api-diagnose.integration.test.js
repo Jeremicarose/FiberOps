@@ -315,20 +315,22 @@ test("api diagnose blocks non-loopback live endpoints by default", async () => {
 test("api diagnose validates the resolved execution node set, not only the requested endpoint", async () => {
   const fixture = await createServerFixture({
     nodeSet: [
-      {
-        id: "node1",
-        name: "node1",
-        endpoint: "http://127.0.0.1:8227",
-        primary: true
-      },
-      {
-        id: "node2",
-        name: "node2",
-        endpoint: "http://example.com:8227",
-        primary: false
-      }
-    ]
-  });
+        {
+          id: "node1",
+          name: "node1",
+          endpoint: "http://127.0.0.1:8227",
+          primary: true,
+          trusted: false
+        },
+        {
+          id: "node2",
+          name: "node2",
+          endpoint: "http://example.com:8227",
+          primary: false,
+          trusted: false
+        }
+      ]
+    });
   const response = await fixture.request({
     method: "POST",
     url: "/api/diagnose",
@@ -342,6 +344,56 @@ test("api diagnose validates the resolved execution node set, not only the reque
   assert.equal(response.statusCode, 403);
   assert.equal(payload.ok, false);
   assert.equal(payload.error.code, "LIVE_ENDPOINT_NOT_ALLOWED");
+});
+
+test("trusted configured internal nodes bypass loopback-only policy", async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async (_url, options) => {
+    const payload = JSON.parse(options.body);
+
+    if (payload.method === "node_info") {
+      return jsonRpcResponse({
+        version: "0.9.0-rc7",
+        pubkey:
+          "02942f9602e5afe0287879b829306d35804c8a2d28ace1d8248b553f580850d696"
+      });
+    }
+
+    if (payload.method === "list_channels") {
+      return jsonRpcResponse({ channels: [] });
+    }
+
+    throw new Error(`Unexpected method ${payload.method}`);
+  };
+
+  try {
+    const fixture = await createServerFixture({
+      nodeSet: [
+        {
+          id: "node1",
+          name: "node1",
+          endpoint: "http://fiber-node:8227",
+          primary: true,
+          trusted: true
+        }
+      ]
+    });
+    const response = await fixture.request({
+      method: "POST",
+      url: "/api/diagnose",
+      body: {
+        mode: "live"
+      }
+    });
+    const payload = JSON.parse(response.body);
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.data.execution.nodes[0].policyValidated, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("api diagnose normalizes configured endpoints before execution-plan matching", async () => {

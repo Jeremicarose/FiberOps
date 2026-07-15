@@ -10,3 +10,5 @@ fnn_*.tar.gz
 playwright-report/
 test-results/
 *.tmp
+deploy/vps/state/
+deploy/vps/*.env

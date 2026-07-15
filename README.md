@@ -1,6 +1,6 @@
-# FiberOps | Fiber Desktop on CKB Operator Console
+# FiberOps | Fiber on CKB Operator Console
 
-FiberOps is the diagnostics engine and repository behind **Fiber Desktop**, a read-only operator console for Fiber on CKB. It turns raw node state into an operator-friendly explanation of what failed, what evidence is real, and what to do next.
+FiberOps is a read-only operator console for Fiber on CKB. It turns raw node state into an operator-friendly explanation of what failed, what evidence is real, and what to do next.
 
 ## Problem
 
@@ -16,7 +16,7 @@ FiberOps exists to close that gap.
 
 FiberOps provides a single diagnostics engine through four surfaces:
 
-- **Browser UI** for demos and operator workflows
+- **FiberOps** for demos and operator workflows
 - **HTTP API** for backend integration
 - **CLI** for scripted diagnostics
 - **Library exports** for embedding in other tools
@@ -30,18 +30,20 @@ It is designed to answer a small set of operational questions clearly:
 - Do multiple live nodes agree on the result?
 - What should the operator do next?
 
-Fiber Desktop is not a wallet and not a payment sender UI. It is operator software for understanding Fiber routing behavior safely.
+FiberOps is not a wallet and not a payment sender UI. It is operator software for understanding Fiber routing behavior safely.
 
 The current desktop shell is organized around a small set of primary workspaces:
 
 - **Overview** for health, changes, and next actions
 - **Nodes** for sender posture and live node comparison
-- **Payments** for history, retries, and failure clusters
-- **Routes** for candidate path analysis
+- **Channels** for channel state and readiness details
+- **Routing** for candidate path analysis
 - **Diagnostics** for deep failure explanation
-- **Settings** for observation defaults and runtime safety
+- **Activity** for history and replay
+- **Testing** for guided proof flows, presets, and local lab workflows
+- **Configuration** for observation defaults and runtime safety
 
-Supporting flows such as **Simulations**, **Activity replay**, **Logs**, and **Reports** are still available, but they are treated as contextual investigation tools rather than the first thing a judge or operator has to navigate.
+The interface is workflow-oriented rather than tab-heavy. Supporting investigation tools such as scenario presets, replay history, and lab validation are part of a single operator story instead of separate disconnected demos.
 
 Key architectural properties:
 
@@ -52,21 +54,29 @@ Key architectural properties:
 
 ## Screenshots
 
-### Guided proof flow
+### Workspace shell and overview flow
 
-![FiberOps guided home](docs/screenshots/guided-home.png)
+The current FiberOps shell is organized around dedicated operator workspaces instead of a single generic dashboard.
 
-### Blocked route diagnosis
+![FiberOps workspace shell](docs/screenshots/guided-home.png)
 
-![FiberOps blocked route diagnosis](docs/screenshots/blocked-route-diagnosis.png)
+### Diagnostics workspace
 
-### Degraded RPC failure state
+Run diagnosis without leaving context. Inputs, summary, checks, evidence, and references stay visible in the same workspace.
+
+![FiberOps diagnostics workspace](docs/screenshots/blocked-route-diagnosis.png)
+
+### Nodes workspace
+
+Compare configured senders and peers in one operator view, including readiness, outbound capacity, and route proof posture.
+
+![FiberOps nodes workspace](docs/screenshots/multi-node-comparison.png)
+
+### Degraded-state handling
+
+FiberOps preserves operator context when an upstream RPC or backend path is unhealthy instead of collapsing into an unreadable error state.
 
 ![FiberOps degraded RPC failure state](docs/screenshots/degraded-rpc-failure.png)
-
-### Multi-node comparison
-
-![FiberOps multi-node comparison](docs/screenshots/multi-node-comparison.png)
 
 ## Quick start
 
@@ -90,24 +100,27 @@ Open `http://localhost:3000`.
 
 For local configuration templates, see `.env.example` and `examples/live-node-set.json`.
 
+For a judge-facing hosted deployment with a real Fiber backend, see [VPS judging deployment](docs/vps-judging-deploy.md).
+
 ## Usage overview
 
 ### Browser UI
 
-Use the browser app to:
+Use the FiberOps app to:
 
 - open the current network overview first
-- jump directly into node, payment, route, or diagnostics workflows
-- run one-click demo scenarios from `Simulations`
-- inspect live node readiness
-- compare multi-node perspectives
-- review route preview evidence
-- replay backend history when enabled
+- compare configured senders and peers in **Nodes**
+- inspect channel posture in **Channels**
+- review path and proof posture in **Routing**
+- run deep investigation flows in **Diagnostics**
+- replay prior investigations in **Activity**
+- use **Testing** for guided proof flows, live presets, and bundled lab facts
+- switch into **Demo** or **Live** mode depending on whether the workflow should be deterministic or backed by real nodes
 - switch between auto, light, and dark themes during review
 
-### Demo scenarios
+### Guided proof and demo presets
 
-The current `Simulations` workspace includes one-click scenario buttons for reliable demos:
+The `Testing` workspace includes guided proof cards and one-click presets for reliable demos and validation:
 
 - `Healthy Payment`
 - `Low Liquidity`
@@ -115,7 +128,7 @@ The current `Simulations` workspace includes one-click scenario buttons for reli
 - `Fee Budget Too Low`
 - `Route Not Found`
 
-These are intended for presentations and judging. They remove the risk of trying to recreate a failure live while an audience is watching.
+This flow is designed for presentations and judging. It avoids the need to recreate failures live while an audience is watching and provides a clean bridge from deterministic replay to live-node proof.
 
 ### HTTP API
 
@@ -182,6 +195,7 @@ Start here:
 - [Runtime model](docs/runtime-model.md) — evidence tiers and runtime semantics
 - [Failure modes](docs/failure-modes.md) — diagnosis taxonomy and operator actions
 - [Local lab runbook](docs/local-lab-runbook.md) — prepare and operate the bundled lab
+- [VPS judging deployment](docs/vps-judging-deploy.md) — host FiberOps plus a private Fiber node on a VPS
 - [End-to-end validation](docs/e2e-validation.md) — validation paths for UI, API, and live lab workflows
 - [Judge demo narrative](docs/judge-demo.md) — story-first presentation flow for demos and judging
 - [Release process](docs/release-process.md) — release checklist and tagging flow
@@ -191,6 +205,7 @@ Suggested reading paths:
 - **New to FiberOps:** README -> Developer guide -> Architecture
 - **Integrating the API:** README -> Developer guide -> Contracts -> Runtime model
 - **Running the local lab:** README -> Local lab runbook -> End-to-end validation
+- **Hosting for judges:** README -> VPS judging deployment -> Judge demo narrative
 - **Debugging a failure:** README -> Failure modes -> Runtime model -> Contracts
 - **Presenting to judges:** README -> Judge demo narrative -> End-to-end validation
 
